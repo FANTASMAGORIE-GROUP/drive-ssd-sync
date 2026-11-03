@@ -1,14 +1,25 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+const appeler = (canal) => (...args) => ipcRenderer.invoke(canal, ...args);
+const ecouter = (canal) => (fn) => ipcRenderer.on(canal, (_e, data) => fn(data));
+
 contextBridge.exposeInMainWorld('app', {
-  etatInitial: () => ipcRenderer.invoke('etat-initial'),
-  connecter: () => ipcRenderer.invoke('connecter'),
-  choisirFichier: (lien) => ipcRenderer.invoke('choisir-fichier', lien),
-  nom: (nom) => ipcRenderer.invoke('nom', nom),
-  cleOpenai: (cle) => ipcRenderer.invoke('cle-openai', cle),
-  numero: (n) => ipcRenderer.invoke('numero', n),
-  rescanner: () => ipcRenderer.invoke('rescanner'),
-  ouvrirFichier: () => ipcRenderer.invoke('ouvrir-fichier'),
-  changerFichier: () => ipcRenderer.invoke('changer-fichier'),
-  surEtat: (fn) => ipcRenderer.on('etat', (_e, data) => fn(data)),
+  etatInitial: appeler('etat-initial'),
+  connecter: appeler('connecter'),
+  choisirFichier: appeler('choisir-fichier'),
+  nom: appeler('nom'),
+  cleOpenai: appeler('cle-openai'),
+  disques: appeler('disques'),
+  attendre: appeler('attendre'),
+  liberer: appeler('liberer'),
+  verifier: appeler('verifier'),
+  synchroniser: appeler('synchroniser'),
+  ajouter: appeler('ajouter'),
+  renumeroter: appeler('renumeroter'),
+  ouvrirFichier: appeler('ouvrir-fichier'),
+  changerFichier: appeler('changer-fichier'),
+  surSsd: ecouter('ssd'),
+  surLecture: ecouter('ssd-lecture'),
+  surRetrait: ecouter('ssd-retire'),
+  surErreur: ecouter('erreur'),
 });

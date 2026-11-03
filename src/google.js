@@ -7,6 +7,9 @@ const store = require('./store');
 
 const SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
 const API = 'https://sheets.googleapis.com/v4/spreadsheets';
+// Fichier d'Anne servant de modèle de mise en forme (onglet GÉNÉRAL, id 0).
+const MODELE_ID = '1xzCsScSuVAmmj9QesZrY5QFMUWpKZ5g7i7ymC-ygIqY';
+const MODELE_ONGLET = 0;
 
 const b64url = (buf) => buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
@@ -77,8 +80,12 @@ const plage = (onglet, cellules) => encodeURIComponent(`'${onglet.replace(/'/g, 
 const sheets = {
   idDepuisLien: (lien) => (lien.match(/\/d\/([a-zA-Z0-9_-]+)/) || [])[1],
   titres: async (id) => {
-    const j = await api(`${id}?fields=properties.title,sheets.properties.title`);
-    return { titre: j.properties.title, onglets: j.sheets.map((s) => s.properties.title) };
+    const j = await api(`${id}?fields=properties.title,sheets.properties(title,sheetId)`);
+    return {
+      titre: j.properties.title,
+      onglets: j.sheets.map((s) => s.properties.title),
+      ids: Object.fromEntries(j.sheets.map((s) => [s.properties.title, s.properties.sheetId])),
+    };
   },
   lire: async (id, onglet, cellules, rendu = 'FORMULA') =>
     (await api(`${id}/values/${plage(onglet, cellules)}?valueRenderOption=${rendu}`)).values || [],
@@ -90,8 +97,34 @@ const sheets = {
     api(`${id}/values/${plage(onglet, 'A1')}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, {
       method: 'POST', body: JSON.stringify({ values: [ligne] }),
     }),
+  notes: async (id, onglet, cellules) => {
+    const j = await api(`${id}?ranges=${plage(onglet, cellules)}&fields=sheets.data.rowData.values(formattedValue,note)`);
+    return (j.sheets[0].data[0].rowData || []).map((r) => {
+      const c = (r.values || [])[0] || {};
+      return { valeur: c.formattedValue, note: c.note };
+    });
+  },
+  miseEnForme: (id, requests) =>
+    api(`${id}:batchUpdate`, { method: 'POST', body: JSON.stringify({ requests }) }),
+  // Copie l'onglet GÉNÉRAL du fichier d'Anne (styles, couleurs, statistiques globales) puis vide les disques.
+  copierModele: async (id, titre) => {
+    const copie = await api(`${MODELE_ID}/sheets/${MODELE_ONGLET}:copyTo`, {
+      method: 'POST', body: JSON.stringify({ destinationSpreadsheetId: id }),
+    });
+    const sheetId = copie.sheetId;
+    await api(`${id}:batchUpdate`, { method: 'POST', body: JSON.stringify({ requests: [
+      { updateSheetProperties: { properties: { sheetId, title: titre }, fields: 'title' } },
+      { updateCells: { range: { sheetId, startRowIndex: 1, endRowIndex: 300, startColumnIndex: 0, endColumnIndex: 10 }, fields: 'userEnteredValue,note' } },
+      // Même mise en forme sur toutes les lignes (celle d'une ligne « normale » d'Anne), sans ses couleurs ponctuelles.
+      { copyPaste: {
+        source: { sheetId, startRowIndex: 2, endRowIndex: 3, startColumnIndex: 0, endColumnIndex: 10 },
+        destination: { sheetId, startRowIndex: 1, endRowIndex: 300, startColumnIndex: 0, endColumnIndex: 10 },
+        pasteType: 'PASTE_FORMAT',
+      } },
+    ] }) });
+  },
   creerOnglet: (id, titre) =>
     api(`${id}:batchUpdate`, { method: 'POST', body: JSON.stringify({ requests: [{ addSheet: { properties: { title: titre } } }] }) }),
 };
 
-module.exports = { connecter, sheets, estConnecte: () => !!store.get('google') };
+module.exports = { connecter, sheets, api, estConnecte: () => !!store.get('google') };
