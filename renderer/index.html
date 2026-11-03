@@ -2,86 +2,246 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
 <title>SSD Drive Sync</title>
 <style>
-  :root { --fond:#fff7f2; --carte:#ffffff; --texte:#3b2f2f; --doux:#9a8580; --rose:#ff8fa3; --rose-fonce:#f06283; --vert:#5cc8a0; --jaune:#ffd166; }
-  * { box-sizing:border-box; margin:0; }
-  body { font-family:"Segoe UI",-apple-system,system-ui,sans-serif; background:var(--fond); color:var(--texte); padding:28px 26px; height:100vh; display:flex; flex-direction:column; user-select:none; }
-  h1 { font-size:22px; display:flex; align-items:center; gap:10px; }
-  .sous { color:var(--doux); font-size:13px; margin:4px 0 22px; }
-  .carte { background:var(--carte); border-radius:22px; padding:24px; box-shadow:0 8px 24px rgba(240,98,131,.10); text-align:center; }
-  .grand { font-size:64px; line-height:1; margin-bottom:14px; }
-  .titre { font-weight:600; font-size:17px; margin-bottom:6px; }
-  .texte { color:var(--doux); font-size:14px; line-height:1.45; }
-  button { font:inherit; border:0; border-radius:999px; padding:12px 22px; font-weight:600; cursor:pointer; background:var(--rose); color:#fff; transition:transform .1s, background .2s; }
-  button:hover { background:var(--rose-fonce); } button:active { transform:scale(.97); }
-  button.lien { background:none; color:var(--doux); font-weight:400; padding:6px 10px; font-size:13px; }
-  button.lien:hover { color:var(--texte); }
-  input { font:inherit; width:100%; border:2px solid #f3e3dc; border-radius:14px; padding:11px 14px; margin:14px 0; outline:none; background:#fffdfb; color:var(--texte); }
-  input:focus { border-color:var(--rose); }
-  input.num { font-size:28px; text-align:center; width:110px; font-weight:700; }
-  .barre { height:12px; background:#f6e9e3; border-radius:99px; overflow:hidden; margin:16px 0 6px; }
-  .barre div { height:100%; background:linear-gradient(90deg,var(--vert),var(--jaune),var(--rose)); border-radius:99px; transition:width .6s; }
-  .stats { display:flex; justify-content:space-between; font-size:13px; color:var(--doux); }
-  .erreur { color:var(--rose-fonce); font-size:13px; margin-top:10px; min-height:18px; }
-  .bas { margin-top:auto; display:flex; justify-content:center; gap:4px; flex-wrap:wrap; padding-top:16px; }
-  .flotte { animation:flotte 2.4s ease-in-out infinite; display:inline-block; }
-  @keyframes flotte { 50% { transform:translateY(-8px) rotate(-4deg); } }
-  .tourne { animation:tourne 1.2s linear infinite; display:inline-block; }
-  @keyframes tourne { to { transform:rotate(360deg); } }
-  .pop { animation:pop .45s cubic-bezier(.3,1.6,.6,1); }
-  @keyframes pop { from { transform:scale(.6); opacity:0; } }
-  .cache { display:none !important; }
+  :root {
+    --fond: #fff6f1; --fond-2: #ffece6; --carte: #ffffff; --texte: #2e2333; --doux: #8f7c84; --trait: #f1e2dc;
+    --rose: #ff7f98; --rose-fonce: #ec5577; --rose-pale: #ffe4ea; --prune: #4a3758;
+    --vert: #3fb489; --vert-pale: #dff5ec; --jaune: #f2b73f; --jaune-pale: #fdf1d6; --rouge: #e5534b; --rouge-pale: #fbe3e1;
+    --ombre: 0 1px 2px rgba(74, 55, 88, .06), 0 8px 24px rgba(236, 85, 119, .10);
+    --ombre-forte: 0 2px 4px rgba(74, 55, 88, .08), 0 18px 40px rgba(236, 85, 119, .18);
+    --rayon: 20px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fond: #1c1621; --fond-2: #241c2a; --carte: #2a2131; --texte: #f6eef2; --doux: #a8949f; --trait: #3a2f41;
+      --rose-pale: #4a2533; --vert-pale: #1f3a30; --jaune-pale: #3d321a; --rouge-pale: #44231f; --prune: #e7d9f0;
+      --ombre: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .25);
+      --ombre-forte: 0 2px 4px rgba(0, 0, 0, .35), 0 18px 40px rgba(0, 0, 0, .35);
+    }
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    background: radial-gradient(120% 70% at 50% -10%, var(--fond-2), var(--fond) 60%);
+    color: var(--texte); padding: 22px 22px 14px; display: flex; flex-direction: column;
+    user-select: none; -webkit-font-smoothing: antialiased; font-size: 14px; overflow: hidden;
+  }
+  svg.i { width: 18px; height: 18px; flex: none; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* En-tête */
+  header { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+  header img { width: 44px; height: 44px; filter: drop-shadow(0 4px 10px rgba(236, 85, 119, .25)); }
+  header h1 { font-size: 18px; font-weight: 700; letter-spacing: -.01em; }
+  .puce { display: inline-flex; align-items: center; gap: 5px; margin-top: 2px; font-size: 12px; color: var(--doux);
+    max-width: 290px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .puce .point { width: 7px; height: 7px; border-radius: 50%; background: var(--vert); box-shadow: 0 0 0 3px var(--vert-pale); flex: none; }
+
+  /* Écrans */
+  #ecran { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .carte { background: var(--carte); border-radius: var(--rayon); padding: 26px 24px; box-shadow: var(--ombre); text-align: center; }
+  .entre { animation: entre .38s cubic-bezier(.2, .9, .3, 1.2); }
+  @keyframes entre { from { opacity: 0; transform: translateY(10px) scale(.98); } }
+  .illus { width: 112px; height: 112px; margin: 0 auto 16px; display: grid; place-items: center; border-radius: 32px; background: var(--rose-pale); color: var(--rose-fonce); position: relative; }
+  .illus svg.i { width: 52px; height: 52px; stroke-width: 1.7; }
+  .illus.vert { background: var(--vert-pale); color: var(--vert); }
+  .titre { font-weight: 700; font-size: 17px; letter-spacing: -.01em; margin-bottom: 6px; }
+  .texte { color: var(--doux); line-height: 1.5; }
+  .flotte { animation: flotte 2.6s ease-in-out infinite; }
+  @keyframes flotte { 50% { transform: translateY(-6px); } }
+  .onde::before, .onde::after { content: ""; position: absolute; inset: 0; border-radius: 32px; border: 2px solid var(--rose); opacity: 0; animation: onde 2.2s ease-out infinite; }
+  .onde::after { animation-delay: 1.1s; }
+  @keyframes onde { from { opacity: .5; transform: scale(1); } to { opacity: 0; transform: scale(1.45); } }
+  .points { display: inline-flex; gap: 5px; margin-top: 14px; }
+  .points i { width: 7px; height: 7px; border-radius: 50%; background: var(--rose); animation: point 1.2s ease-in-out infinite; }
+  .points i:nth-child(2) { animation-delay: .15s; } .points i:nth-child(3) { animation-delay: .3s; }
+  @keyframes point { 0%, 80%, 100% { opacity: .25; transform: scale(.8); } 40% { opacity: 1; transform: scale(1); } }
+  .anneau { width: 64px; height: 64px; margin: 6px auto 18px; border-radius: 50%; border: 5px solid var(--rose-pale); border-top-color: var(--rose); animation: tourne .9s linear infinite; }
+  @keyframes tourne { to { transform: rotate(360deg); } }
+  .coche path { stroke-dasharray: 60; stroke-dashoffset: 60; animation: trace .5s .15s ease-out forwards; }
+  @keyframes trace { to { stroke-dashoffset: 0; } }
+
+  /* Champs et boutons */
+  input { font: inherit; width: 100%; border: 1.5px solid var(--trait); border-radius: 14px; padding: 12px 14px; margin-top: 12px;
+    outline: none; background: var(--fond); color: var(--texte); user-select: text; transition: border-color .2s, box-shadow .2s; }
+  input:focus { border-color: var(--rose); box-shadow: 0 0 0 4px var(--rose-pale); }
+  .actions { display: flex; flex-direction: column; gap: 9px; margin-top: 20px; }
+  button { font: inherit; font-weight: 600; border: 0; border-radius: 14px; padding: 13px 18px; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; gap: 9px; color: #fff;
+    background: linear-gradient(180deg, var(--rose), var(--rose-fonce)); box-shadow: 0 6px 16px rgba(236, 85, 119, .3);
+    transition: transform .12s, box-shadow .2s, filter .2s; }
+  button:hover { filter: brightness(1.05); box-shadow: 0 8px 22px rgba(236, 85, 119, .38); }
+  button:active { transform: scale(.98); }
+  button.second { background: var(--fond-2); color: var(--texte); box-shadow: none; }
+  button.second:hover { background: var(--trait); }
+  button.lien { background: none; box-shadow: none; color: var(--doux); font-weight: 500; font-size: 12.5px; padding: 8px 10px; }
+  button.lien:hover { color: var(--texte); }
+  button.lien svg.i { width: 15px; height: 15px; }
+
+  /* Stats */
+  .jauge { height: 10px; background: var(--fond-2); border-radius: 99px; overflow: hidden; margin: 18px 0 8px; }
+  .jauge div { height: 100%; border-radius: 99px; transition: width .8s cubic-bezier(.2, .8, .2, 1); }
+  .stats { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--doux); }
+  .stats b { color: var(--texte); font-weight: 600; }
+
+  /* Liste des disques */
+  .liste-tete { display: flex; justify-content: space-between; align-items: baseline; margin: 0 4px 10px; }
+  .liste-tete b { font-size: 15px; } .liste-tete span { font-size: 12px; color: var(--doux); }
+  .choix { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 9px; padding: 2px 4px 10px; margin: 0 -4px; }
+  .choix::-webkit-scrollbar { width: 6px; } .choix::-webkit-scrollbar-thumb { background: var(--trait); border-radius: 9px; }
+  .disque { all: unset; box-sizing: border-box; cursor: pointer; display: grid; grid-template-columns: 42px 1fr auto; gap: 12px; align-items: center;
+    background: var(--carte); border-radius: 16px; padding: 12px 14px; box-shadow: var(--ombre); transition: transform .15s, box-shadow .2s; }
+  .disque:hover { transform: translateY(-1px); box-shadow: var(--ombre-forte); }
+  .disque:focus-visible { outline: 2px solid var(--rose); outline-offset: 2px; }
+  .num { width: 42px; height: 42px; border-radius: 13px; background: var(--rose-pale); color: var(--rose-fonce); display: grid; place-items: center; font-weight: 800; font-size: 16px; }
+  .disque .nom { font-weight: 650; display: flex; align-items: center; gap: 6px; }
+  .disque .sous { font-size: 12px; color: var(--doux); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .relie { width: 7px; height: 7px; border-radius: 50%; background: var(--vert); box-shadow: 0 0 0 3px var(--vert-pale); }
+  .pct { font-size: 12px; font-weight: 700; padding: 4px 8px; border-radius: 99px; }
+  .mini { grid-column: 2 / 4; height: 5px; background: var(--fond-2); border-radius: 9px; overflow: hidden; margin-top: -4px; }
+  .mini div { height: 100%; border-radius: 9px; }
+  .ajout { display: flex; align-items: center; gap: 12px; padding: 14px; border: 1.5px dashed var(--rose); background: transparent; box-shadow: none; color: var(--rose-fonce); grid-template-columns: none; }
+  .ajout:hover { background: var(--rose-pale); box-shadow: none; }
+  .ajout .num { background: var(--rose); color: #fff; }
+
+  .alerte { display: flex; gap: 10px; align-items: flex-start; background: var(--jaune-pale); color: #8a5d06; border-radius: 14px;
+    padding: 11px 13px; margin: 0 0 10px; font-size: 12.5px; line-height: 1.45; }
+  .alerte b { display: block; font-size: 13px; }
+  .alerte svg.i { margin-top: 1px; }
+  .badge-double { font-size: 10.5px; font-weight: 700; color: #8a5d06; background: var(--jaune-pale); padding: 2px 7px; border-radius: 99px; }
+  .disque.double { box-shadow: 0 0 0 1.5px var(--jaune), var(--ombre); }
+  .liste-tete span { display: inline-flex; align-items: center; gap: 8px; }
+  button.recharger { background: var(--carte); color: var(--rose-fonce); box-shadow: var(--ombre); padding: 5px 10px; font-size: 12px; border-radius: 99px; gap: 5px; }
+  button.recharger:hover { background: var(--rose-pale); }
+  button.recharger svg.i { width: 13px; height: 13px; }
+  button.recharger.en-cours svg.i { animation: tourne .8s linear infinite; }
+  .rappel { display: inline-block; font-size: 12.5px; font-weight: 600; color: var(--texte); background: var(--fond-2);
+    padding: 6px 12px; border-radius: 99px; margin: 2px 0 8px; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .illus.orange { background: var(--jaune-pale); color: #b07a0d; }
+  @media (prefers-color-scheme: dark) { .alerte, .badge-double { color: #f2c86a; } }
+  .erreur { color: var(--rouge); font-size: 12.5px; text-align: center; min-height: 18px; margin-top: 10px; }
+  footer { display: flex; justify-content: center; gap: 2px; padding-top: 6px; }
+  .cache { display: none !important; }
 </style>
 </head>
 <body>
-  <h1>💾 SSD Drive Sync</h1>
-  <p class="sous" id="sous">Le carnet des disques se remplit tout seul.</p>
+  <header>
+    <img src="../build/logo.svg" alt="">
+    <div>
+      <h1>SSD Drive Sync</h1>
+      <div class="puce" id="puce"><span>Le carnet des disques se remplit tout seul</span></div>
+    </div>
+  </header>
 
-  <div id="ecran" class="carte pop"></div>
+  <main id="ecran"></main>
   <p class="erreur" id="erreur"></p>
 
-  <div class="bas" id="bas">
-    <button class="lien" id="btn-ouvrir">📄 Ouvrir le fichier</button>
-    <button class="lien" id="btn-rescan">🔄 Re-scanner</button>
-    <button class="lien" id="btn-changer">⚙️ Changer de fichier</button>
-  </div>
+  <footer class="cache" id="bas">
+    <button class="lien" id="btn-ouvrir"></button>
+    <button class="lien" id="btn-changer"></button>
+  </footer>
 
 <script>
+// Icônes dessinées (trait 24 px), nettes à toutes les tailles.
+const ICONES = {
+  google: '<path d="M21 12.2c0-.7-.1-1.3-.2-1.9H12v3.6h5a4.3 4.3 0 0 1-1.9 2.8v2.3h3A9 9 0 0 0 21 12.2Z"/><path d="M12 21a9 9 0 0 0 6.1-2.2l-3-2.3a5.4 5.4 0 0 1-8-2.8H4v2.4A9 9 0 0 0 12 21Z"/><path d="M7.1 13.7a5.4 5.4 0 0 1 0-3.4V7.9H4a9 9 0 0 0 0 8.2l3.1-2.4Z"/><path d="M12 6.6c1.4 0 2.6.5 3.6 1.4l2.6-2.6A9 9 0 0 0 4 7.9l3.1 2.4A5.4 5.4 0 0 1 12 6.6Z"/>',
+  lien: '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',
+  cle: '<circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.8-9.8M17 6l3 3M14.5 8.5l2.5 2.5"/>',
+  prise: '<path d="M9 2v5M15 2v5"/><path d="M6 7h12v4a6 6 0 0 1-12 0V7Z"/><path d="M12 17v5"/>',
+  disque: '<rect x="3" y="4" width="18" height="16" rx="4"/><path d="M7 9h6"/><circle cx="16.5" cy="15.5" r="1.3" fill="currentColor"/>',
+  sync: '<path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 3v5h5"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 21v-5h-5"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  retour: '<path d="M19 12H5M11 18l-6-6 6-6"/>',
+  fichier: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',
+  reglage: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/>',
+  coche: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  nouveau: '<rect x="3" y="4" width="18" height="16" rx="4"/><path d="M12 9v6M9 12h6"/>',
+  question: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5v.4"/><circle cx="12" cy="17" r=".6" fill="currentColor"/>',
+};
+const ico = (nom, classe = '') => `<svg class="i ${classe}" viewBox="0 0 24 24">${ICONES[nom]}</svg>`;
+
+// Hors de l'app (aperçu dans un navigateur), une fausse API permet de voir chaque écran.
+if (!window.app) {
+  const faux = [
+    { numero: '1', capacite: '2', pourcent: '82,5', localisation: 'TOM', projets: 'IFIS', relie: true },
+    { numero: '2', capacite: '2', pourcent: '96', localisation: 'Fantasmagorie > Salon', projets: 'CreativGen', relie: true },
+    { numero: '3', capacite: '2', pourcent: '94', localisation: 'Fantasmagorie > Salon', projets: 'PB Noël', relie: false, doublon: true, ligne: 3 },
+    { numero: '3', capacite: '2', pourcent: '79', localisation: 'TOM', projets: 'IFIS', relie: false, doublon: true, ligne: 4 },
+    { numero: '5', capacite: '1', pourcent: '56,6', localisation: 'TOM', projets: 'Hypnos', relie: false },
+  ];
+  const ssd = { disque: { modele: 'Samsung T7 Shield 2 To', total_to: 2, utilise_to: 1.42, restant_to: 0.58, pourcent: 71 }, numero: null };
+  const attendre = (ms) => new Promise((ok) => setTimeout(ok, ms));
+  window.app = {
+    etatInitial: async () => ({ connecte: true, sheetId: 'x', titre: 'LES DISQUES DURS', nom: 'Anne', cleOpenai: true }),
+    disques: async () => { await attendre(300); return faux; },
+    attendre: async () => { setTimeout(() => window.__ssd && window.__ssd(ssd), 2500); return null; },
+    liberer: async () => {}, synchroniser: async (n) => { await attendre(1800); return { numero: n, ecrits: ['Capacité (En To)', 'Utilisé', 'Restant', '%', 'Projets'] }; },
+    verifier: async (n) => (n === '1' ? { autre: { modele: 'SanDisk Extreme 2 To', date: '03/11/2026' }, ecart: null }
+      : n === '2' ? { autre: null, ecart: { fichier: 4, mesure: 2 } } : { autre: null, ecart: null }),
+    renumeroter: async (ligne) => { const d = faux.find((x) => x.ligne === ligne); d.numero = '6'; faux.forEach((x) => { x.doublon = false; }); return '6'; },
+    ajouter: async () => { await attendre(1800); return { numero: '4', ecrits: ['Capacité (En To)', 'Utilisé', 'Restant', '%', 'Projets'] }; },
+    ouvrirFichier: async () => {}, changerFichier: async () => {}, connecter: async () => {}, choisirFichier: async () => 'X', nom: async () => {}, cleOpenai: async () => {},
+    surSsd: (fn) => { window.__ssd = fn; }, surRetrait: () => {}, surErreur: () => {},
+  };
+}
+
 const $ = (id) => document.getElementById(id);
 const ecran = $('ecran');
 let etat = {};
+let vue = null;   // écran affiché : 'liste', 'attente', 'pret', 'nouveau', 'travail'…
+let cible = null; // n° du disque attendu, ou 'nouveau'
 
-function afficher(html) {
-  ecran.classList.remove('pop'); void ecran.offsetWidth; ecran.classList.add('pop');
-  ecran.innerHTML = html;
-  $('erreur').textContent = '';
+const echapper = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const erreur = (m) => { $('erreur').textContent = m ? String(m).replace(/^.*Error: /, '') : ''; };
+
+// Mêmes seuils de couleur que le fichier d'Anne : vert < 70 %, jaune 70–90 %, rouge > 90 %.
+const teinte = (p) => {
+  const n = parseFloat(String(p).replace(',', '.'));
+  if (Number.isNaN(n)) return ['var(--trait)', 'var(--fond-2)', 'var(--doux)'];
+  if (n > 90) return ['var(--rouge)', 'var(--rouge-pale)', 'var(--rouge)'];
+  if (n >= 70) return ['var(--jaune)', 'var(--jaune-pale)', '#a8740f'];
+  return ['var(--vert)', 'var(--vert-pale)', 'var(--vert)'];
+};
+
+function afficher(nom, html, carte = true) {
+  vue = nom;
+  ecran.innerHTML = carte ? `<div class="carte entre">${html}</div>` : `<div class="entre" style="display:flex;flex-direction:column;min-height:0;flex:1">${html}</div>`;
+  erreur('');
 }
 
-function echapper(s) { return String(s).replace(/[&<>"]/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c])); }
+const boutons = (liste) => `<div class="actions">${liste.map(([id, icone, texte, classe]) =>
+  `<button id="${id}" class="${classe || ''}">${icone ? ico(icone) : ''}${texte}</button>`).join('')}</div>`;
+
+const illus = (icone, classe = '') => `<div class="illus ${classe}">${ico(icone)}</div>`;
+
+const stats = (d) => `<div class="jauge"><div style="width:${d.pourcent}%;background:${teinte(d.pourcent)[0]}"></div></div>
+  <div class="stats"><span><b>${fr(d.utilise_to)} To</b> utilisés</span><span><b>${fr(d.restant_to)} To</b> libres · ${fr(d.pourcent)} %</span></div>`;
+const fr = (n) => String(n).replace('.', ',');
+
+// ---------- Réglages (une seule fois) ----------
 
 function ecranConnexion() {
-  $('bas').classList.add('cache');
-  afficher(`<div class="grand flotte">👋</div>
-    <p class="titre">Bienvenue !</p>
-    <p class="texte">Pour commencer, connecte ton compte Google.</p><br>
-    <button id="go">Se connecter avec Google</button>`);
+  afficher('reglage', `${illus('google')}
+    <p class="titre">Bienvenue</p>
+    <p class="texte">Connecte ton compte Google pour relier l'app à ton fichier des disques.</p>
+    ${boutons([['go', 'google', 'Se connecter avec Google']])}`);
   $('go').onclick = async () => {
-    $('go').textContent = 'Regarde ton navigateur…';
+    $('go').lastChild.textContent = 'Regarde ton navigateur…';
     try { await window.app.connecter(); etat.connecte = true; suivant(); }
-    catch (e) { $('go').textContent = 'Se connecter avec Google'; $('erreur').textContent = e.message; }
+    catch (e) { $('go').lastChild.textContent = 'Se connecter avec Google'; erreur(e.message); }
   };
 }
 
 function ecranFichier() {
-  $('bas').classList.add('cache');
-  afficher(`<div class="grand flotte">🔗</div>
+  afficher('reglage', `${illus('lien')}
     <p class="titre">Ton fichier des disques</p>
-    <p class="texte">Colle le lien du Google Sheets, et ton prénom.</p>
+    <p class="texte">Colle le lien du Google Sheets (même vide) et ton prénom.</p>
     <input id="lien" placeholder="https://docs.google.com/spreadsheets/…">
-    <input id="prenom" placeholder="Ton prénom" value="${echapper(etat.nom)}" style="margin-top:0">
-    <button id="ok">C'est parti</button>`);
+    <input id="prenom" placeholder="Ton prénom" value="${echapper(etat.nom)}">
+    ${boutons([['ok', null, "C'est parti"]])}`);
   $('ok').onclick = async () => {
     try {
       etat.titre = await window.app.choisirFichier($('lien').value.trim());
@@ -89,71 +249,218 @@ function ecranFichier() {
       await window.app.nom(etat.nom);
       etat.sheetId = true;
       suivant();
-    } catch (e) { $('erreur').textContent = e.message; }
+    } catch (e) { erreur(e.message); }
   };
 }
 
 function ecranCle() {
-  $('bas').classList.add('cache');
-  afficher(`<div class="grand flotte">🔑</div>
+  afficher('reglage', `${illus('cle')}
     <p class="titre">Dernière étape</p>
-    <p class="texte">Colle la clé OpenAI (à faire une seule fois).</p>
+    <p class="texte">Colle la clé OpenAI. C'est à faire une seule fois.</p>
     <input id="cle" type="password" placeholder="sk-…">
-    <button id="ok">Enregistrer</button>`);
+    ${boutons([['ok', null, 'Enregistrer']])}`);
   $('ok').onclick = async () => {
     try { await window.app.cleOpenai($('cle').value.trim()); etat.cleOpenai = true; suivant(); }
-    catch (e) { $('erreur').textContent = e.message.replace(/^.*Error: /, ''); }
+    catch (e) { erreur(e.message); }
   };
 }
 
-function ecranAttente() {
+// ---------- Liste des disques ----------
+
+async function ecranListe() {
+  cible = null;
+  window.app.liberer();
   $('bas').classList.remove('cache');
-  $('sous').textContent = `Relié à « ${etat.titre} »`;
-  afficher(`<div class="grand flotte">🔌</div>
-    <p class="titre">Branche un SSD</p>
-    <p class="texte">Je le reconnais et je remplis le fichier toute seule.<br>Tu peux fermer cette fenêtre, je reste active.</p>`);
+  $('puce').innerHTML = `<span class="point"></span><span>${echapper(etat.titre)}</span>`;
+  afficher('chargement', `<div class="anneau"></div><p class="texte">Je lis le fichier…</p>`);
+  try { rendreListe(await window.app.disques()); }
+  catch (e) { afficher('liste', '', false); erreur(e.message); }
 }
 
-function stats(d) {
-  return `<div class="barre"><div style="width:${d.pourcent}%"></div></div>
-    <div class="stats"><span>${d.utilise_to} To utilisés</span><span>${d.restant_to} To libres</span></div>`;
+// La liste se relit toute seule (toutes les 30 s et au retour sur la fenêtre) pour suivre les changements
+// faits à la main dans le fichier ; elle n'est redessinée que si quelque chose a changé.
+let derniereListe = [];
+async function rafraichir() {
+  if (vue !== 'liste' || document.hidden) return;
+  try {
+    const disques = await window.app.disques();
+    if (vue === 'liste' && JSON.stringify(disques) !== JSON.stringify(derniereListe)) rendreListe(disques, false);
+  } catch { /* hors ligne : on garde l'affichage actuel */ }
+}
+setInterval(rafraichir, 30000);
+window.addEventListener('focus', rafraichir);
+
+function rendreListe(disques, anime = true) {
+  derniereListe = disques;
+  const defile = ecran.querySelector('.choix')?.scrollTop || 0;
+  const relies = disques.filter((d) => d.relie).length;
+  const doubles = [...new Set(disques.filter((d) => d.doublon).map((d) => d.numero))];
+  afficher('liste', `<div class="liste-tete"><b>Tes disques</b><span>${disques.length} au total · ${relies} reliés
+      <button class="recharger" id="recharger" title="Recharger le fichier">${ico('sync')}Recharger</button></span></div>
+    ${doubles.length ? `<div class="alerte">${ico('question')}<span><b>Numéros en double : ${doubles.map((n) => `n°${echapper(n)}`).join(', ')}</b>
+      Plusieurs disques portent le même numéro. Touche l'un d'eux pour corriger, sinon ils ne pourront pas être synchronisés.</span></div>` : ''}
+    <div class="choix">
+      <button class="disque ajout" data-num="nouveau"><span class="num">${ico('plus')}</span>
+        <span><span class="nom">Ajouter un disque</span><span class="sous" style="display:block;color:inherit;opacity:.8">Un SSD qui n'est pas encore dans le fichier</span></span></button>
+      ${disques.map((c) => {
+        const [fort, pale, texte] = teinte(c.pourcent);
+        return `<button class="disque${c.doublon ? ' double' : ''}" data-num="${echapper(c.numero)}" data-ligne="${c.ligne}">
+          <span class="num">${echapper(c.numero)}</span>
+          <span style="min-width:0">
+            <span class="nom">Disque ${echapper(c.numero)}${c.capacite ? ` <span style="color:var(--doux);font-weight:500">· ${echapper(c.capacite)} To</span>` : ''}${c.relie ? '<span class="relie" title="SSD relié"></span>' : ''}${c.doublon ? '<span class="badge-double">n° en double</span>' : ''}</span>
+            <span class="sous" style="display:block">${echapper([c.localisation, c.projets].filter(Boolean).join(' · ') || 'Pas encore synchronisé')}</span>
+          </span>
+          ${c.pourcent ? `<span class="pct" style="background:${pale};color:${texte}">${echapper(c.pourcent)} %</span>` : '<span></span>'}
+          ${c.pourcent ? `<span class="mini"><div style="width:${parseFloat(String(c.pourcent).replace(',', '.'))}%;background:${fort}"></div></span>` : ''}
+        </button>`;
+      }).join('')}
+    </div>`, false);
+  if (!anime) { ecran.firstElementChild.classList.remove('entre'); ecran.querySelector('.choix').scrollTop = defile; }
+  $('recharger').onclick = async () => {
+    $('recharger').classList.add('en-cours');
+    try { rendreListe(await window.app.disques(), false); } catch (e) { $('recharger').classList.remove('en-cours'); erreur(e.message); }
+  };
+  ecran.querySelectorAll('.disque').forEach((b) => {
+    b.onclick = () => (b.classList.contains('double') ? ecranDoublon(b.dataset.num, Number(b.dataset.ligne)) : ecranAttente(b.dataset.num));
+  });
 }
 
-function surEtat(e) {
-  if (e.etape === 'attente') return ecranAttente();
-  if (e.etape === 'lecture') return afficher(`<div class="grand tourne">💿</div><p class="titre">SSD détecté !</p><p class="texte">Je regarde ce qu'il y a dedans…</p>`);
-  if (e.etape === 'inconnu') {
-    afficher(`<div class="grand">🆕</div>
-      <p class="titre">Je ne connais pas encore ce SSD</p>
-      <p class="texte">${echapper(e.disque.modele)} · ${e.disque.total_to} To<br>Quel est son numéro dans le fichier ?</p>
-      <input class="num" id="num" inputmode="numeric" autofocus><br>
-      <button id="ok">Valider</button>`);
-    const valider = () => { if ($('num').value.trim()) window.app.numero($('num').value); };
-    $('ok').onclick = valider;
-    $('num').onkeydown = (ev) => ev.key === 'Enter' && valider();
+function ecranDoublon(numero, ligne) {
+  afficher('doublon', `<div class="illus orange">${ico('question')}</div>
+    <p class="titre">Plusieurs disques portent le n°${echapper(numero)}</p>
+    <p class="texte">L'app ne peut pas savoir lequel remplir. Je peux donner à celui-ci le premier numéro libre :
+      seule la case du numéro change, le reste de la ligne ne bouge pas.</p>
+    ${boutons([['corriger', 'coche', 'Corriger automatiquement'], ['ouvrir', 'fichier', 'Corriger moi-même dans le fichier', 'second'],
+    ['retour', 'retour', 'Retour à la liste', 'second']])}`);
+  $('corriger').onclick = async () => {
+    try {
+      const nouveau = await window.app.renumeroter(ligne);
+      await ecranListe();
+      erreur('');
+      $('puce').innerHTML += `<span>· disque renuméroté n°${echapper(nouveau)}</span>`;
+    } catch (e) { erreur(e.message); }
+  };
+  $('ouvrir').onclick = () => window.app.ouvrirFichier();
+  $('retour').onclick = ecranListe;
+}
+
+// ---------- Branchement et synchronisation ----------
+
+async function ecranAttente(numero) {
+  cible = numero;
+  const nouveau = numero === 'nouveau';
+  // Rappel de ce qu'il y a sur le disque attendu, pour prendre le bon SSD sur l'étagère.
+  const info = derniereListe.find((d) => d.numero === numero);
+  const rappel = info ? [info.capacite && `${info.capacite} To`, info.localisation, info.projets].filter(Boolean).join(' · ') : '';
+  afficher('attente', `<div class="illus onde"><span class="flotte" style="display:grid">${ico('prise')}</span></div>
+    <p class="titre">${nouveau ? 'Branche le nouveau disque' : `Branche le disque n°${echapper(numero)}`}</p>
+    ${rappel ? `<p class="rappel">${echapper(rappel)}</p>` : ''}
+    <p class="texte">J'attends qu'il apparaisse sur l'ordinateur</p>
+    <div class="points"><i></i><i></i><i></i></div>
+    ${boutons([['retour', 'retour', 'Retour à la liste', 'second']])}`);
+  $('retour').onclick = ecranListe;
+  const deja = await window.app.attendre(numero);
+  if (deja && vue === 'attente') surSsd(deja);
+}
+
+function surSsd(b) {
+  if (!['attente', 'liste'].includes(vue)) return;
+  if (vue === 'liste') cible = b.numero || 'nouveau';
+  if (b.numero && cible !== 'nouveau' && b.numero !== cible) return ecranAutre(b);
+  if (b.numero || cible !== 'nouveau') return ecranPret(b, b.numero || cible);
+  ecranNouveau(b);
+}
+
+async function ecranPret(b, numero) {
+  afficher('verif', `<div class="anneau"></div><p class="texte">Je vérifie que c'est le bon disque…</p>`);
+  let v = { autre: null, ecart: null };
+  try { v = await window.app.verifier(numero); } catch (e) { return ecranListe().then(() => erreur(e.message)); }
+  if (vue !== 'verif') return;
+
+  // Ce n° est déjà relié à un autre SSD : on n'écrase pas le lien sans le dire.
+  if (v.autre) {
+    afficher('pret', `<div class="illus orange">${ico('question')}</div>
+      <p class="titre">Ce n'est probablement pas le bon SSD</p>
+      <p class="texte">Le disque n°${echapper(numero)} est déjà relié à un autre SSD
+        (${echapper(v.autre.modele || 'modèle inconnu')}${v.autre.date ? `, relié le ${echapper(v.autre.date)}` : ''}).<br>
+        Le SSD branché est un ${echapper(b.disque.modele)} de ${fr(b.disque.total_to)} To.</p>
+      ${boutons([['retour', 'retour', 'Retour à la liste'], ['forcer', 'sync', 'Remplacer quand même', 'second']])}
+      <p class="texte" style="font-size:12px;margin-top:10px">« Remplacer » sert seulement si le SSD du disque n°${echapper(numero)} a vraiment été changé.</p>`);
+    $('forcer').onclick = () => travailler(() => window.app.synchroniser(numero, true));
+    $('retour').onclick = ecranListe;
     return;
   }
-  if (e.etape === 'ia') return afficher(`<div class="grand tourne">✨</div><p class="titre">Disque n°${echapper(e.numero)}</p><p class="texte">Je remplis le fichier…</p>${stats(e.disque)}`);
-  if (e.etape === 'fini') {
-    return afficher(`<div class="grand">🎉</div>
-      <p class="titre">Disque n°${echapper(e.numero)} à jour !</p>
-      <p class="texte">${e.ecrits.length ? 'Mis à jour : ' + e.ecrits.map(echapper).join(', ') : 'Rien n\'avait changé'}<br>+ ligne ajoutée dans les emprunts</p>
-      ${stats(e.disque)}`);
-  }
-  if (e.etape === 'erreur') { ecranAttente(); $('erreur').textContent = '😕 ' + e.message; }
+
+  afficher('pret', `${illus('disque', v.ecart ? 'orange' : 'vert')}
+    <p class="titre">Disque n°${echapper(numero)} branché</p>
+    <p class="texte">${echapper(b.disque.modele)} · ${fr(b.disque.total_to)} To</p>
+    ${v.ecart ? `<div class="alerte" style="margin-top:14px;text-align:left">${ico('question')}<span><b>La capacité ne correspond pas</b>
+      Ce SSD fait ${fr(v.ecart.mesure)} To, mais le disque n°${echapper(numero)} fait ${fr(v.ecart.fichier)} To dans le fichier. Vérifie que c'est le bon.</span></div>` : ''}
+    ${stats(b.disque)}
+    ${boutons([['sync', 'sync', v.ecart ? 'Synchroniser quand même' : 'Synchroniser avec le Drive', v.ecart ? 'second' : ''],
+    ['retour', 'retour', 'Retour à la liste', v.ecart ? '' : 'second']])}`);
+  $('sync').onclick = () => travailler(() => window.app.synchroniser(numero));
+  $('retour').onclick = ecranListe;
 }
+
+function ecranNouveau(b) {
+  afficher('nouveau', `${illus('nouveau')}
+    <p class="titre">Nouveau disque détecté</p>
+    <p class="texte">${echapper(b.disque.modele)} · ${fr(b.disque.total_to)} To</p>
+    ${stats(b.disque)}
+    ${boutons([['ajout', 'plus', 'Ajouter le disque au Drive'], ['retour', 'retour', 'Retour à la liste', 'second']])}`);
+  $('ajout').onclick = () => travailler(() => window.app.ajouter());
+  $('retour').onclick = ecranListe;
+}
+
+function ecranAutre(b) {
+  afficher('pret', `${illus('question')}
+    <p class="titre">Ce SSD est le disque n°${echapper(b.numero)}</p>
+    <p class="texte">Tu attendais le n°${echapper(cible)}. Tu veux synchroniser le n°${echapper(b.numero)} ?</p>
+    ${boutons([['sync', 'sync', `Synchroniser le n°${echapper(b.numero)}`], ['retour', 'retour', 'Retour à la liste', 'second']])}`);
+  $('sync').onclick = () => travailler(() => window.app.synchroniser(b.numero));
+  $('retour').onclick = ecranListe;
+}
+
+async function travailler(action) {
+  afficher('travail', `<div class="anneau"></div><p class="titre">Je remplis le fichier</p><p class="texte">Ça prend quelques secondes</p>`);
+  try {
+    const r = await action();
+    afficher('fini', `<div class="illus vert">${ico('coche', 'coche')}</div>
+      <p class="titre">Disque n°${echapper(r.numero)} synchronisé</p>
+      <p class="texte">${r.ecrits.length ? `Mis à jour : ${r.ecrits.map(echapper).join(', ')}` : "Rien n'avait changé"}<br>Une ligne a été ajoutée dans les emprunts.</p>
+      ${boutons([['retour', 'retour', 'Retour à la liste'], ['ouvrir', 'fichier', 'Voir le fichier', 'second']])}`);
+    $('ouvrir').onclick = () => window.app.ouvrirFichier();
+    $('retour').onclick = ecranListe;
+  } catch (e) {
+    await ecranListe();
+    erreur(e.message);
+  }
+}
+
+window.app.surSsd(surSsd);
+window.app.surRetrait(() => {
+  if (['pret', 'nouveau', 'verif'].includes(vue)) { ecranAttente(cible); erreur('Le SSD a été débranché'); }
+});
+window.app.surErreur(erreur);
 
 function suivant() {
   if (!etat.connecte) return ecranConnexion();
   if (!etat.sheetId) return ecranFichier();
   if (!etat.cleOpenai) return ecranCle();
-  ecranAttente();
+  ecranListe();
 }
 
+$('btn-ouvrir').innerHTML = `${ico('fichier')}Ouvrir le fichier`;
+$('btn-changer').innerHTML = `${ico('reglage')}Changer de fichier`;
 $('btn-ouvrir').onclick = () => window.app.ouvrirFichier();
-$('btn-rescan').onclick = () => window.app.rescanner();
-$('btn-changer').onclick = async () => { await window.app.changerFichier(); etat.sheetId = null; suivant(); };
-window.app.surEtat(surEtat);
+$('btn-changer').onclick = async () => {
+  await window.app.changerFichier();
+  etat.sheetId = null;
+  $('bas').classList.add('cache');
+  $('puce').innerHTML = '<span>Le carnet des disques se remplit tout seul</span>';
+  suivant();
+};
 window.app.etatInitial().then((e) => { etat = e; suivant(); });
 </script>
 </body>
