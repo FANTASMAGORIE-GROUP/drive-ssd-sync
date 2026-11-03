@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
+<title>SSD Drive Sync</title>
+<style>
+  :root { --fond:#fff7f2; --carte:#ffffff; --texte:#3b2f2f; --doux:#9a8580; --rose:#ff8fa3; --rose-fonce:#f06283; --vert:#5cc8a0; --jaune:#ffd166; }
+  * { box-sizing:border-box; margin:0; }
+  body { font-family:"Segoe UI",-apple-system,system-ui,sans-serif; background:var(--fond); color:var(--texte); padding:28px 26px; height:100vh; display:flex; flex-direction:column; user-select:none; }
+  h1 { font-size:22px; display:flex; align-items:center; gap:10px; }
+  .sous { color:var(--doux); font-size:13px; margin:4px 0 22px; }
+  .carte { background:var(--carte); border-radius:22px; padding:24px; box-shadow:0 8px 24px rgba(240,98,131,.10); text-align:center; }
+  .grand { font-size:64px; line-height:1; margin-bottom:14px; }
+  .titre { font-weight:600; font-size:17px; margin-bottom:6px; }
+  .texte { color:var(--doux); font-size:14px; line-height:1.45; }
+  button { font:inherit; border:0; border-radius:999px; padding:12px 22px; font-weight:600; cursor:pointer; background:var(--rose); color:#fff; transition:transform .1s, background .2s; }
+  button:hover { background:var(--rose-fonce); } button:active { transform:scale(.97); }
+  button.lien { background:none; color:var(--doux); font-weight:400; padding:6px 10px; font-size:13px; }
+  button.lien:hover { color:var(--texte); }
+  input { font:inherit; width:100%; border:2px solid #f3e3dc; border-radius:14px; padding:11px 14px; margin:14px 0; outline:none; background:#fffdfb; color:var(--texte); }
+  input:focus { border-color:var(--rose); }
+  input.num { font-size:28px; text-align:center; width:110px; font-weight:700; }
+  .barre { height:12px; background:#f6e9e3; border-radius:99px; overflow:hidden; margin:16px 0 6px; }
+  .barre div { height:100%; background:linear-gradient(90deg,var(--vert),var(--jaune),var(--rose)); border-radius:99px; transition:width .6s; }
+  .stats { display:flex; justify-content:space-between; font-size:13px; color:var(--doux); }
+  .erreur { color:var(--rose-fonce); font-size:13px; margin-top:10px; min-height:18px; }
+  .bas { margin-top:auto; display:flex; justify-content:center; gap:4px; flex-wrap:wrap; padding-top:16px; }
+  .flotte { animation:flotte 2.4s ease-in-out infinite; display:inline-block; }
+  @keyframes flotte { 50% { transform:translateY(-8px) rotate(-4deg); } }
+  .tourne { animation:tourne 1.2s linear infinite; display:inline-block; }
+  @keyframes tourne { to { transform:rotate(360deg); } }
+  .pop { animation:pop .45s cubic-bezier(.3,1.6,.6,1); }
+  @keyframes pop { from { transform:scale(.6); opacity:0; } }
+  .cache { display:none !important; }
+</style>
+</head>
+<body>
+  <h1>💾 SSD Drive Sync</h1>
+  <p class="sous" id="sous">Le carnet des disques se remplit tout seul.</p>
+
+  <div id="ecran" class="carte pop"></div>
+  <p class="erreur" id="erreur"></p>
+
+  <div class="bas" id="bas">
+    <button class="lien" id="btn-ouvrir">📄 Ouvrir le fichier</button>
+    <button class="lien" id="btn-rescan">🔄 Re-scanner</button>
+    <button class="lien" id="btn-changer">⚙️ Changer de fichier</button>
+  </div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const ecran = $('ecran');
+let etat = {};
+
+function afficher(html) {
+  ecran.classList.remove('pop'); void ecran.offsetWidth; ecran.classList.add('pop');
+  ecran.innerHTML = html;
+  $('erreur').textContent = '';
+}
+
+function echapper(s) { return String(s).replace(/[&<>"]/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c])); }
+
+function ecranConnexion() {
+  $('bas').classList.add('cache');
+  afficher(`<div class="grand flotte">👋</div>
+    <p class="titre">Bienvenue !</p>
+    <p class="texte">Pour commencer, connecte ton compte Google.</p><br>
+    <button id="go">Se connecter avec Google</button>`);
+  $('go').onclick = async () => {
+    $('go').textContent = 'Regarde ton navigateur…';
+    try { await window.app.connecter(); etat.connecte = true; suivant(); }
+    catch (e) { $('go').textContent = 'Se connecter avec Google'; $('erreur').textContent = e.message; }
+  };
+}
+
+function ecranFichier() {
+  $('bas').classList.add('cache');
+  afficher(`<div class="grand flotte">🔗</div>
+    <p class="titre">Ton fichier des disques</p>
+    <p class="texte">Colle le lien du Google Sheets, et ton prénom.</p>
+    <input id="lien" placeholder="https://docs.google.com/spreadsheets/…">
+    <input id="prenom" placeholder="Ton prénom" value="${echapper(etat.nom)}" style="margin-top:0">
+    <button id="ok">C'est parti</button>`);
+  $('ok').onclick = async () => {
+    try {
+      etat.titre = await window.app.choisirFichier($('lien').value.trim());
+      etat.nom = $('prenom').value.trim();
+      await window.app.nom(etat.nom);
+      etat.sheetId = true;
+      suivant();
+    } catch (e) { $('erreur').textContent = e.message; }
+  };
+}
+
+function ecranAttente() {
+  $('bas').classList.remove('cache');
+  $('sous').textContent = `Relié à « ${etat.titre} »`;
+  afficher(`<div class="grand flotte">🔌</div>
+    <p class="titre">Branche un SSD</p>
+    <p class="texte">Je le reconnais et je remplis le fichier toute seule.<br>Tu peux fermer cette fenêtre, je reste active.</p>`);
+}
+
+function stats(d) {
+  return `<div class="barre"><div style="width:${d.pourcent}%"></div></div>
+    <div class="stats"><span>${d.utilise_to} To utilisés</span><span>${d.restant_to} To libres</span></div>`;
+}
+
+function surEtat(e) {
+  if (e.etape === 'attente') return ecranAttente();
+  if (e.etape === 'lecture') return afficher(`<div class="grand tourne">💿</div><p class="titre">SSD détecté !</p><p class="texte">Je regarde ce qu'il y a dedans…</p>`);
+  if (e.etape === 'inconnu') {
+    afficher(`<div class="grand">🆕</div>
+      <p class="titre">Je ne connais pas encore ce SSD</p>
+      <p class="texte">${echapper(e.disque.modele)} · ${e.disque.total_to} To<br>Quel est son numéro dans le fichier ?</p>
+      <input class="num" id="num" inputmode="numeric" autofocus><br>
+      <button id="ok">Valider</button>`);
+    const valider = () => { if ($('num').value.trim()) window.app.numero($('num').value); };
+    $('ok').onclick = valider;
+    $('num').onkeydown = (ev) => ev.key === 'Enter' && valider();
+    return;
+  }
+  if (e.etape === 'ia') return afficher(`<div class="grand tourne">✨</div><p class="titre">Disque n°${echapper(e.numero)}</p><p class="texte">Je remplis le fichier…</p>${stats(e.disque)}`);
+  if (e.etape === 'fini') {
+    return afficher(`<div class="grand">🎉</div>
+      <p class="titre">Disque n°${echapper(e.numero)} à jour !</p>
+      <p class="texte">${e.ecrits.length ? 'Mis à jour : ' + e.ecrits.map(echapper).join(', ') : 'Rien n\'avait changé'}<br>+ ligne ajoutée dans les emprunts</p>
+      ${stats(e.disque)}`);
+  }
+  if (e.etape === 'erreur') { ecranAttente(); $('erreur').textContent = '😕 ' + e.message; }
+}
+
+function suivant() {
+  if (!etat.connecte) return ecranConnexion();
+  if (!etat.sheetId) return ecranFichier();
+  ecranAttente();
+}
+
+$('btn-ouvrir').onclick = () => window.app.ouvrirFichier();
+$('btn-rescan').onclick = () => window.app.rescanner();
+$('btn-changer').onclick = async () => { await window.app.changerFichier(); etat.sheetId = null; suivant(); };
+window.app.surEtat(surEtat);
+window.app.etatInitial().then((e) => { etat = e; suivant(); });
+</script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+{
+  "name": "ssd-drive-sync",
+  "productName": "SSD Drive Sync",
+  "version": "1.0.0",
+  "description": "Détecte les SSD branchés et remplit le Google Sheets des disques.",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "secrets": "node scripts/write-secrets.js",
+    "dist": "electron-builder --publish never"
+  },
+  "build": {
+    "appId": "com.fantasmagorie.ssddrivesync",
+    "files": ["main.js", "preload.js", "src/**", "renderer/**", "secrets.json"],
+    "win": { "target": "nsis" },
+    "nsis": { "oneClick": true, "runAfterFinish": true },
+    "mac": { "target": [{ "target": "dmg", "arch": ["universal"] }], "category": "public.app-category.productivity" }
+  },
+  "devDependencies": {
+    "electron": "33.2.1",
+    "electron-builder": "25.1.8"
+  }
+}
