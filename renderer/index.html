@@ -93,6 +93,19 @@ function ecranFichier() {
   };
 }
 
+function ecranCle() {
+  $('bas').classList.add('cache');
+  afficher(`<div class="grand flotte">🔑</div>
+    <p class="titre">Dernière étape</p>
+    <p class="texte">Colle la clé OpenAI (à faire une seule fois).</p>
+    <input id="cle" type="password" placeholder="sk-…">
+    <button id="ok">Enregistrer</button>`);
+  $('ok').onclick = async () => {
+    try { await window.app.cleOpenai($('cle').value.trim()); etat.cleOpenai = true; suivant(); }
+    catch (e) { $('erreur').textContent = e.message.replace(/^.*Error: /, ''); }
+  };
+}
+
 function ecranAttente() {
   $('bas').classList.remove('cache');
   $('sous').textContent = `Relié à « ${etat.titre} »`;
@@ -133,6 +146,7 @@ function surEtat(e) {
 function suivant() {
   if (!etat.connecte) return ecranConnexion();
   if (!etat.sheetId) return ecranFichier();
+  if (!etat.cleOpenai) return ecranCle();
   ecranAttente();
 }
 

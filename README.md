@@ -12,7 +12,8 @@ ni les cellules qui contiennent une formule.
 
 ## Installeurs
 Actions > « Compiler l'app » > Run workflow (ou pousser un tag `v*`).
-Les secrets GitHub `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `OPENAI_API_KEY` doivent être définis.
+Les secrets GitHub `GOOGLE_CLIENT_ID` et `GOOGLE_CLIENT_SECRET` doivent être définis.
+La clé OpenAI n'est jamais intégrée à l'installeur : elle est demandée une fois au premier lancement.
 Le `.exe` et le `.dmg` sont dans les artefacts du run. Ils ne sont pas signés : Windows affiche
 « Informations complémentaires > Exécuter quand même », Mac demande clic droit > Ouvrir.
 

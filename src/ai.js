@@ -1,5 +1,9 @@
 // Demande à OpenAI quelles colonnes de la ligne du disque remplir avec les infos mesurées.
 const secrets = require('./secrets');
+const store = require('./store');
+
+// La clé est saisie une fois dans l'app (jamais intégrée à l'installeur) ; secrets.json sert en développement.
+const cle = () => store.get('openaiKey') || secrets.OPENAI_API_KEY;
 
 const CONSIGNES = `Tu remplis la ligne d'un disque dur dans un tableau Google Sheets.
 On te donne les en-têtes de colonnes, la ligne actuelle et les infos mesurées sur le disque.
@@ -14,7 +18,7 @@ Règles :
 async function proposerMaj(entetes, ligneActuelle, disque) {
   const r = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
-    headers: { Authorization: `Bearer ${secrets.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+    headers: { Authorization: `Bearer ${cle()}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: secrets.OPENAI_MODEL,
       response_format: { type: 'json_object' },
@@ -29,4 +33,4 @@ async function proposerMaj(entetes, ligneActuelle, disque) {
   return JSON.parse(json.choices[0].message.content).maj || {};
 }
 
-module.exports = { proposerMaj };
+module.exports = { proposerMaj, aUneCle: () => !!cle() };

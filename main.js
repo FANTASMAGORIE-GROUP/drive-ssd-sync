@@ -137,7 +137,13 @@ ipcMain.handle('etat-initial', async () => ({
   sheetId: store.get('sheetId'),
   titre: store.get('sheetTitre'),
   nom: store.get('nom') || '',
+  cleOpenai: ai.aUneCle(),
 }));
+
+ipcMain.handle('cle-openai', (_e, cle) => {
+  if (!/^sk-/.test(cle)) throw new Error('Une clé OpenAI commence par « sk- »');
+  store.set('openaiKey', cle);
+});
 
 ipcMain.handle('connecter', async () => { await google.connecter(); afficher(); });
 

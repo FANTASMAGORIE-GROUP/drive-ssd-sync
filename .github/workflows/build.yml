@@ -21,7 +21,6 @@ jobs:
         env:
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       - run: npm run dist
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
