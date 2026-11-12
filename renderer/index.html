@@ -115,6 +115,9 @@
   .alerte { display: flex; gap: 10px; align-items: flex-start; background: var(--jaune-pale); color: #8a5d06; border-radius: 14px;
     padding: 11px 13px; margin: 0 0 10px; font-size: 12.5px; line-height: 1.45; }
   .alerte b { display: block; font-size: 13px; }
+  .maj { align-items: center; margin: 0 0 12px; }
+  .maj span { flex: 1; }
+  .maj button { padding: 8px 14px; font-size: 12.5px; white-space: nowrap; }
   .alerte svg.i { margin-top: 1px; }
   .badge-double { font-size: 10.5px; font-weight: 700; color: #8a5d06; background: var(--jaune-pale); padding: 2px 7px; border-radius: 99px; }
   .disque.double { box-shadow: 0 0 0 1.5px var(--jaune), var(--ombre); }
@@ -142,6 +145,7 @@
     </div>
   </header>
 
+  <div class="alerte maj cache" id="maj"></div>
   <main id="ecran"></main>
   <p class="erreur" id="erreur"></p>
 
@@ -196,7 +200,8 @@ if (!window.app) {
     },
     changerNumero: async (ligne, ancien, n) => { await attendre(400); faux.find((x) => x.ligne === ligne && x.numero === ancien).numero = n; return n; },
     cleOpenai: async (k) => { await attendre(800); if (k !== 'sk-bonne-cle-de-test') throw new Error('OpenAI refuse cette clé : elle est fausse, expirée ou supprimée'); },
-    ecrireContenu: async () => attendre(400), ouvrirDoublons: async () => {}, surProgres: (fn) => { window.__progres = fn; },
+    ecrireContenu: async () => attendre(400), ouvrirDoublons: async () => {}, surProgres: (fn) => { window.__progres = fn; }, surDeconnexion: (fn) => { window.__deco = fn; },
+    majEtat: async () => null, majInstaller: async () => {}, surMaj: (fn) => { window.__maj = fn; },
     verifier: async (n) => (n === '1' ? { autre: { modele: 'SanDisk Extreme 2 To', date: '03/11/2026' }, ecart: null }
       : n === '2' ? { autre: null, ecart: { fichier: 4, mesure: 2 } } : { autre: null, ecart: null }),
     renumeroter: async (ligne) => { const d = faux.find((x) => x.ligne === ligne); d.numero = '6'; faux.forEach((x) => { x.doublon = false; }); return '6'; },
@@ -241,34 +246,67 @@ const fr = (n) => String(n).replace('.', ',');
 
 // ---------- Réglages (une seule fois) ----------
 
+// Toujours joignable : au premier lancement, quand Google a coupé la connexion, ou pour changer de compte.
 function ecranConnexion() {
+  $('bas').classList.add('cache');
+  const deja = etat.connecte && etat.sheetId; // simple changement de compte : on peut revenir
   afficher('reglage', `${illus('google')}
-    <p class="titre">Bienvenue</p>
+    <p class="titre">${etat.sheetId ? 'Connexion à Google' : 'Bienvenue'}</p>
     <p class="texte">Connecte ton compte Google pour relier l'app à ton fichier des disques.</p>
-    ${boutons([['go', 'google', 'Se connecter avec Google']])}`);
+    ${boutons([['go', 'google', 'Se connecter avec Google'], ...(deja ? [['retour', 'retour', 'Retour à la liste', 'second']] : [])])}
+    <p class="texte" style="font-size:12px;margin-top:10px">La page de connexion s'ouvre dans ton navigateur. Si rien ne s'ouvre ou si tu l'as fermée, clique à nouveau.</p>`);
   $('go').onclick = async () => {
     $('go').lastChild.textContent = 'Regarde ton navigateur…';
+    erreur('');
     try { await window.app.connecter(); etat.connecte = true; suivant(); }
-    catch (e) { $('go').lastChild.textContent = 'Se connecter avec Google'; erreur(e.message); }
+    catch (e) { if ($('go')) $('go').lastChild.textContent = 'Se connecter avec Google'; erreur(e.message); }
   };
+  if (deja) $('retour').onclick = ecranListe;
 }
 
-function ecranFichier() {
+// Nouvelle version de l'app : prête à installer (Windows) ou à télécharger (Mac).
+function afficherMaj(info) {
+  if (!info) return;
+  const b = $('maj');
+  b.innerHTML = `${ico('sync')}<span><b>Nouvelle version ${echapper(info.version)} disponible</b>${info.prete
+    ? 'Elle est déjà téléchargée.'
+    : 'Ouvre le fichier téléchargé et glisse l’app dans Applications.'}</span><button id="btn-maj">${info.prete ? 'Redémarrer' : 'Télécharger'}</button>`;
+  b.classList.remove('cache');
+  $('btn-maj').onclick = () => window.app.majInstaller();
+}
+window.app.surMaj(afficherMaj);
+window.app.majEtat().then(afficherMaj);
+
+// Google a coupé la connexion (expirée, retirée, ou jamais faite) : on le dit et on propose de se reconnecter.
+window.app.surDeconnexion(() => {
+  if (vue === 'reglage' && $('go')) return; // déjà sur l'écran de connexion
+  etat.connecte = false;
+  ecranConnexion();
+  erreur('Ta connexion Google a expiré ou a été retirée : reconnecte-toi');
+});
+
+// changer = true : un fichier est déjà relié ; il le reste tant que le nouveau n'est pas validé, et on peut revenir.
+function ecranFichier(changer = false) {
+  $('bas').classList.add('cache');
   afficher('reglage', `${illus('lien')}
-    <p class="titre">Ton fichier des disques</p>
+    <p class="titre">${changer ? 'Changer de fichier' : 'Ton fichier des disques'}</p>
     <p class="texte">Colle le lien du Google Sheets (même vide) et ton prénom.</p>
     <input id="lien" placeholder="https://docs.google.com/spreadsheets/…">
     <input id="prenom" placeholder="Ton prénom" value="${echapper(etat.nom)}">
-    ${boutons([['ok', null, "C'est parti"]])}`);
+    ${boutons([['ok', null, "C'est parti"], ...(changer ? [['retour', 'retour', 'Retour à la liste', 'second']] : [])])}
+    <button class="lien" id="compte" style="margin-top:10px">${ico('google')}Changer de compte Google</button>`);
   $('ok').onclick = async () => {
+    $('ok').disabled = true;
     try {
       etat.titre = await window.app.choisirFichier($('lien').value.trim());
       etat.nom = $('prenom').value.trim();
       await window.app.nom(etat.nom);
       etat.sheetId = true;
       suivant();
-    } catch (e) { erreur(e.message); }
+    } catch (e) { if ($('ok')) $('ok').disabled = false; erreur(e.message); }
   };
+  if (changer) $('retour').onclick = ecranListe;
+  $('compte').onclick = () => ecranConnexion();
 }
 
 // Première clé, ou changement de clé depuis le bas de l'app. L'ancienne clé n'est jamais affichée :
@@ -567,13 +605,8 @@ $('btn-changer').innerHTML = `${ico('reglage')}Changer de fichier`;
 $('btn-cle').innerHTML = `${ico('cle')}Clé OpenAI`;
 $('btn-cle').onclick = () => ecranCle(true);
 $('btn-ouvrir').onclick = () => window.app.ouvrirFichier();
-$('btn-changer').onclick = async () => {
-  await window.app.changerFichier();
-  etat.sheetId = null;
-  $('bas').classList.add('cache');
-  $('puce').innerHTML = '<span>Le carnet des disques se remplit tout seul</span>';
-  suivant();
-};
+// L'ancien fichier reste relié tant que le nouveau n'a pas été validé.
+$('btn-changer').onclick = () => ecranFichier(true);
 window.app.etatInitial().then((e) => { etat = e; suivant(); });
 </script>
 </body>

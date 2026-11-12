@@ -8,6 +8,7 @@ const scan = require('./src/scan');
 const doublons = require('./src/doublons');
 const { styleGeneral } = require('./src/style');
 const { proteger, validerMaj } = require('./src/garde');
+const maj = require('./src/maj');
 
 const { sheets } = google;
 const INTOUCHABLES = /localis|contenu|[ée]tat|sauvegarde|nas/i;
@@ -37,6 +38,7 @@ function creerFenetre() {
 }
 
 const envoyer = (canal, data) => fenetre && fenetre.webContents.send(canal, data);
+google.quandDeconnecte(() => { afficher(); envoyer('google-deconnecte'); });
 
 // ---------- Google Sheets ----------
 
@@ -393,12 +395,15 @@ ipcMain.handle('ouvrir-doublons', async () => {
   const gid = (await sheets.titres(sheetId())).ids.Doublons;
   shell.openExternal(`https://docs.google.com/spreadsheets/d/${sheetId()}/edit${gid !== undefined ? `#gid=${gid}` : ''}`);
 });
-ipcMain.handle('changer-fichier', () => { store.supprimer('sheetId'); store.supprimer('sheetTitre'); });
+
+ipcMain.handle('maj-etat', () => maj.etat());
+ipcMain.handle('maj-installer', () => maj.installer());
 
 app.whenReady().then(() => {
   if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: true });
   creerFenetre();
   setInterval(surveiller, 1500);
+  maj.demarrer((info) => envoyer('maj', info));
 });
 
 app.on('before-quit', () => { quitter = true; });

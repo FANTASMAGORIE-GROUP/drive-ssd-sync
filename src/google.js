@@ -55,11 +55,14 @@ async function demanderJeton(params) {
   return json;
 }
 
+// Prévient l'interface quand la connexion Google manque ou a été retirée, quel que soit l'écran affiché.
+let surDeconnexion = () => {};
+
 let cache = { token: null, expire: 0 };
 async function accessToken() {
   if (cache.token && Date.now() < cache.expire) return cache.token;
   const g = store.get('google');
-  if (!g) throw new Error('Pas connecté à Google');
+  if (!g) { surDeconnexion(); throw new Error('Pas connecté à Google : reconnecte-toi'); }
   let j;
   try {
     j = await demanderJeton({ refresh_token: g.refresh_token, grant_type: 'refresh_token' });
@@ -67,6 +70,7 @@ async function accessToken() {
     // Connexion expirée ou retirée par Google : on l'oublie pour que l'app redemande de se connecter.
     if (e.code === 'invalid_grant') {
       store.supprimer('google');
+      surDeconnexion();
       throw new Error('Ta connexion Google a expiré : reconnecte-toi');
     }
     throw e;
@@ -140,4 +144,7 @@ const sheets = {
     api(`${id}:batchUpdate`, { method: 'POST', body: JSON.stringify({ requests: [{ addSheet: { properties: { title: titre, hidden: cache } } }] }) }),
 };
 
-module.exports = { connecter, sheets, api, estConnecte: () => !!store.get('google') };
+module.exports = {
+  connecter, sheets, api, estConnecte: () => !!store.get('google'),
+  quandDeconnecte: (fn) => { surDeconnexion = fn; },
+};
