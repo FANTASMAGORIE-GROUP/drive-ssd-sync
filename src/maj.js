@@ -24,8 +24,12 @@ function signaler(info) { derniere = info; prevenir(info); }
 async function verifierMac() {
   const r = await fetch(`https://api.github.com/repos/${DEPOT}/releases/latest`, { headers: { Accept: 'application/vnd.github+json' } });
   if (!r.ok) return;
-  const version = String((await r.json()).tag_name || '').replace(/^v/, '');
-  if (version && plusRecente(version, app.getVersion())) signaler({ version, prete: false });
+  const sortie = await r.json();
+  const version = String(sortie.tag_name || '').replace(/^v/, '');
+  // La version GitHub existe dès que la build Windows a fini : on attend que le .dmg y soit aussi,
+  // sinon le bouton « Télécharger » tomberait sur une erreur pendant quelques minutes.
+  const dmgPret = (sortie.assets || []).some((a) => a.name === 'SSD-Drive-Sync-Mac.dmg' && a.state === 'uploaded');
+  if (version && dmgPret && plusRecente(version, app.getVersion())) signaler({ version, prete: false });
 }
 
 function demarrer(envoyer) {

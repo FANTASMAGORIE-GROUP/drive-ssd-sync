@@ -1,8 +1,15 @@
 name: Compiler l'app
 
-# Un tag v* (ex. v1.1.2) compile Mac + Windows ET publie la version sur GitHub Releases,
+# Un tag v* (ex. v1.1.4) compile Mac + Windows ET publie la version sur GitHub Releases,
 # avec les fichiers latest*.yml que l'app lit pour se mettre à jour toute seule.
 # Lancé à la main (workflow_dispatch), il compile seulement, sans rien publier.
+#
+# Déroulé d'une version :
+#   1. « preparer » crée la release en BROUILLON, une seule fois (avant, Mac et Windows la créaient
+#      en même temps : l'un des deux échouait avec « already_exists » et ses fichiers manquaient).
+#   2. Mac et Windows compilent en parallèle et envoient leurs fichiers dans ce brouillon.
+#   3. « rendre-visible » publie la release seulement si tous les fichiers sont là : personne ne voit
+#      une version à moitié envoyée (lien de téléchargement cassé, mise à jour impossible).
 on:
   push:
     tags: ['v*']
@@ -12,8 +19,30 @@ permissions:
   contents: write
 
 jobs:
+  preparer:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Créer la release en brouillon
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "La release $TAG existe déjà"
+          else
+            # Notes de version : le message du commit de la version, sans la ligne Co-Authored-By.
+            git log -1 --format=%b | grep -v '^Co-Authored-By' > notes.md
+            gh release create "$TAG" --draft --title "SSD Drive Sync ${TAG#v}" --notes-file notes.md
+          fi
+
   build:
+    needs: preparer
+    # Sans tag, « preparer » est sauté : on compile quand même.
+    if: ${{ !cancelled() && needs.preparer.result != 'failure' }}
     strategy:
+      fail-fast: false
       matrix:
         os: [windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
@@ -38,3 +67,20 @@ jobs:
             dist/*.exe
             dist/*.dmg
             dist/*.yml
+
+  rendre-visible:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publier la release si les fichiers Mac et Windows sont tous là
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          presents=$(gh release view "$TAG" --json assets -q '.assets[] | select(.state == "uploaded") | .name')
+          for f in SSD-Drive-Sync-Windows.exe SSD-Drive-Sync-Mac.dmg latest.yml latest-mac.yml; do
+            echo "$presents" | grep -qx "$f" || { echo "Fichier manquant : $f (la release reste en brouillon)"; exit 1; }
+          done
+          gh release edit "$TAG" --draft=false --latest
