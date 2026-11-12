@@ -34,6 +34,25 @@ const FAUX_DISQUES = [
 ];
 let fauxBranche = null;
 
+// Faux fichiers des faux SSD, avec des doublons dans un même disque et entre les disques 1 et 4.
+function fichiersFaux(volume) {
+  const n = FAUX_DISQUES.findIndex((d) => d.volume === volume);
+  if (n < 0) return [];
+  const liste = [];
+  FAUX_DISQUES[n].dossiers.forEach((dossier, i) => {
+    for (let k = 1; k <= 3; k++) {
+      liste.push([`${dossier}/RUSH/A0${n}${i}_C00${k}.MP4`, (n + i + k) * 1e9 + n * 7]);
+      liste.push([`${dossier}/PHOTOS/IMG_${n}${i}${k}.CR3`, 3e7 + n * 1000 + i * 10 + k]);
+    }
+    liste.push([`${dossier}/SON/mix ${dossier}.wav`, 2e8 + i]);
+    liste.push([`${dossier}/MONTAGE/${dossier}.prproj`, 5e6 + i]);
+    liste.push([`${dossier}/MONTAGE/Backup/${dossier}.prproj`, 5e6 + i]);
+  });
+  if (n === 0) liste.push(['Clip Lumière/EXPORT/Clip Lumière final.mov', 4.2e9]);
+  if (n === 3) liste.push(['Archives 2025/Clip Lumière/Clip Lumière final.mov', 4.2e9], ['Archives 2025/Clip Lumière/A000_C001.MP4', 1e9]);
+  return liste;
+}
+
 function brancherFaux(serialsPris, serialVoulu) {
   const d = FAUX_DISQUES.find((f) => f.serial === serialVoulu) || FAUX_DISQUES.find((f) => !serialsPris.includes(f.serial));
   if (!d) return;
@@ -121,5 +140,5 @@ async function lireDisque(volume) {
 }
 
 module.exports = {
-  volumesMontes, lireDisque, FAUX, brancherFaux, debrancherFaux: () => { fauxBranche = null; },
+  volumesMontes, lireDisque, FAUX, brancherFaux, fichiersFaux, debrancherFaux: () => { fauxBranche = null; },
 };

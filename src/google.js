@@ -80,19 +80,22 @@ const plage = (onglet, cellules) => encodeURIComponent(`'${onglet.replace(/'/g, 
 const sheets = {
   idDepuisLien: (lien) => (lien.match(/\/d\/([a-zA-Z0-9_-]+)/) || [])[1],
   titres: async (id) => {
-    const j = await api(`${id}?fields=properties.title,sheets.properties(title,sheetId)`);
+    const j = await api(`${id}?fields=properties.title,sheets.properties(title,sheetId,gridProperties.columnCount)`);
     return {
       titre: j.properties.title,
       onglets: j.sheets.map((s) => s.properties.title),
       ids: Object.fromEntries(j.sheets.map((s) => [s.properties.title, s.properties.sheetId])),
+      colonnes: Object.fromEntries(j.sheets.map((s) => [s.properties.title, s.properties.gridProperties?.columnCount || 26])),
     };
   },
   lire: async (id, onglet, cellules, rendu = 'FORMULA') =>
     (await api(`${id}/values/${plage(onglet, cellules)}?valueRenderOption=${rendu}`)).values || [],
-  ecrire: (id, onglet, cellules, valeurs) =>
-    api(`${id}/values/${plage(onglet, cellules)}?valueInputOption=USER_ENTERED`, {
+  // RAW : le texte est écrit tel quel (jamais interprété comme une formule ou une date).
+  ecrire: (id, onglet, cellules, valeurs, mode = 'USER_ENTERED') =>
+    api(`${id}/values/${plage(onglet, cellules)}?valueInputOption=${mode}`, {
       method: 'PUT', body: JSON.stringify({ values: valeurs }),
     }),
+  effacer: (id, onglet, cellules) => api(`${id}/values/${plage(onglet, cellules)}:clear`, { method: 'POST', body: '{}' }),
   ajouterLigne: (id, onglet, ligne) =>
     api(`${id}/values/${plage(onglet, 'A1')}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, {
       method: 'POST', body: JSON.stringify({ values: [ligne] }),
@@ -123,8 +126,8 @@ const sheets = {
       } },
     ] }) });
   },
-  creerOnglet: (id, titre) =>
-    api(`${id}:batchUpdate`, { method: 'POST', body: JSON.stringify({ requests: [{ addSheet: { properties: { title: titre } } }] }) }),
+  creerOnglet: (id, titre, cache = false) =>
+    api(`${id}:batchUpdate`, { method: 'POST', body: JSON.stringify({ requests: [{ addSheet: { properties: { title: titre, hidden: cache } } }] }) }),
 };
 
 module.exports = { connecter, sheets, api, estConnecte: () => !!store.get('google') };

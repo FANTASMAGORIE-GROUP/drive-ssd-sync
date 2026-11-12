@@ -4,6 +4,8 @@ const disk = require('./src/disk');
 const google = require('./src/google');
 const ai = require('./src/ai');
 const store = require('./src/store');
+const scan = require('./src/scan');
+const doublons = require('./src/doublons');
 const { styleGeneral } = require('./src/style');
 const { proteger, validerMaj } = require('./src/garde');
 
@@ -208,6 +210,65 @@ async function remplir(id, d, numero) {
   return ecrits;
 }
 
+// Le n° est choisi dans l'app : seule la case du n° change, la note qui relie le SSD reste sur la ligne.
+async function changerNumero(id, ligne, ancien, numero) {
+  numero = String(numero ?? '').trim();
+  if (!numero || numero.length > 20) throw new Error('Écris un numéro (20 caractères au plus)');
+  const disques = await disquesDuFichier(id);
+  const d = disques.find((x) => x.ligne === ligne && x.numero === ancien);
+  if (!d) throw new Error("Ce disque a bougé dans le fichier : recharge la liste et recommence");
+  if (numero === ancien) return numero;
+  if (disques.some((x) => x.ligne !== ligne && x.numero === numero)) throw new Error(`Le n°${numero} est déjà pris par un autre disque`);
+  const { general } = await onglets(id);
+  await sheets.ecrire(id, general, `A${ligne + 1}`, [[/^\d+$/.test(numero) ? Number(numero) : proteger(numero)]]);
+  if (branche) branche.numero = await numeroDuSsd(id, branche.disque.serial);
+  return numero;
+}
+
+// Case « Contenu » du disque : Anne y écrit parfois à la main, donc on ne la remplit seule que si elle est vide.
+async function caseContenu(id, numero) {
+  const { general } = await onglets(id);
+  const lignes = await sheets.lire(id, general, 'A1:Z300', 'FORMATTED_VALUE');
+  const t = ligneTitres(lignes);
+  const col = (lignes[t] || []).findIndex((e) => normaliser(String(e ?? '')).includes('CONTENU'));
+  const index = lignes.findIndex((l, i) => i > t && String(l[0] ?? '').trim() === numero);
+  if (col < 0) throw new Error("Pas de colonne « Contenu » dans l'onglet GÉNÉRAL");
+  if (index < 0) throw new Error(`Le disque n°${numero} n'existe pas dans l'onglet ${general}`);
+  return { general, cellule: `${lettre(col)}${index + 1}`, actuel: String(lignes[index][col] ?? '').trim() };
+}
+
+async function ecrireContenu(id, numero, texte) {
+  const c = await caseContenu(id, numero);
+  await sheets.ecrire(id, c.general, c.cellule, [[proteger(String(texte).slice(0, 1200))]]);
+}
+
+// Lit tous les fichiers du SSD, décrit son contenu et met à jour l'onglet des doublons.
+async function analyser(id, d, numero) {
+  envoyer('progres', 'Je lis tous les dossiers du SSD…');
+  const { fichiers, arbre } = await scan.scanner(d.volume, (n) => envoyer('progres', `${n.toLocaleString('fr-FR')} fichiers lus…`));
+  const res = { fichiers: fichiers.length };
+  try {
+    envoyer('progres', 'Je résume le contenu…');
+    const texte = await ai.decrireContenu(arbre);
+    const { actuel } = await caseContenu(id, numero);
+    const vide = !actuel || actuel === '/';
+    if (vide) await ecrireContenu(id, numero, texte);
+    res.contenu = { texte, ecrit: vide, actuel };
+  } catch (e) { res.contenuErreur = e.message; }
+  try {
+    envoyer('progres', 'Je cherche les doublons…');
+    await doublons.enregistrer(sheets, id, d.serial, numero, fichiers);
+    const numeros = Object.fromEntries((await liens(id)).filter((l) => l.serial).map((l) => [l.serial, l.numero]));
+    const entrees = (await doublons.toutLire(sheets, id)).map((e) => ({ ...e, numero: numeros[e.serial] || e.numero }));
+    const groupes = doublons.calculer(entrees);
+    await doublons.ecrireOnglet(sheets, id, groupes);
+    res.doublons = doublons.resume(groupes, d.serial);
+  } catch (e) { res.doublonsErreur = e.message; }
+  return res;
+}
+
+const analyserSansBloquer = (id, d, numero) => analyser(id, d, numero).catch((e) => ({ erreur: e.message }));
+
 // ---------- Surveillance des SSD ----------
 
 let branche = null; // { disque, numero } du SSD actuellement branché
@@ -247,8 +308,11 @@ ipcMain.handle('etat-initial', async () => ({
   cleOpenai: ai.aUneCle(),
 }));
 
-ipcMain.handle('cle-openai', (_e, cle) => {
-  if (!/^sk-/.test(cle)) throw new Error('Une clé OpenAI commence par « sk- »');
+// La clé n'est enregistrée que si OpenAI l'accepte ; l'ancienne n'est jamais renvoyée à l'interface.
+ipcMain.handle('cle-openai', async (_e, cle) => {
+  cle = String(cle ?? '').trim();
+  if (!/^sk-\S{10,}$/.test(cle)) throw new Error('Une clé OpenAI commence par « sk- » (colle-la en entier)');
+  await ai.testerCle(cle);
   store.set('openaiKey', cle);
 });
 
@@ -306,7 +370,9 @@ ipcMain.handle('synchroniser', async (_e, numero, forcer = false) => {
   }
   await lier(sheetId(), branche.disque, numero);
   branche.numero = numero;
-  return { numero, ecrits: await remplir(sheetId(), branche.disque, numero) };
+  const { disque } = branche;
+  const ecrits = await remplir(sheetId(), disque, numero);
+  return { numero, ecrits, analyse: await analyserSansBloquer(sheetId(), disque, numero) };
 });
 
 ipcMain.handle('ajouter', async () => {
@@ -314,11 +380,19 @@ ipcMain.handle('ajouter', async () => {
   const numero = await nouvelleLigne(sheetId());
   await lier(sheetId(), branche.disque, numero);
   branche.numero = numero;
-  return { numero, ecrits: await remplir(sheetId(), branche.disque, numero) };
+  const { disque } = branche;
+  const ecrits = await remplir(sheetId(), disque, numero);
+  return { numero, ecrits, analyse: await analyserSansBloquer(sheetId(), disque, numero) };
 });
 
 ipcMain.handle('renumeroter', (_e, ligne) => renumeroter(sheetId(), ligne));
+ipcMain.handle('changer-numero', (_e, ligne, ancien, numero) => changerNumero(sheetId(), ligne, ancien, numero));
+ipcMain.handle('ecrire-contenu', (_e, numero, texte) => ecrireContenu(sheetId(), numero, texte));
 ipcMain.handle('ouvrir-fichier', () => shell.openExternal(`https://docs.google.com/spreadsheets/d/${sheetId()}`));
+ipcMain.handle('ouvrir-doublons', async () => {
+  const gid = (await sheets.titres(sheetId())).ids.Doublons;
+  shell.openExternal(`https://docs.google.com/spreadsheets/d/${sheetId()}/edit${gid !== undefined ? `#gid=${gid}` : ''}`);
+});
 ipcMain.handle('changer-fichier', () => { store.supprimer('sheetId'); store.supprimer('sheetTitre'); });
 
 app.whenReady().then(() => {

@@ -60,6 +60,16 @@ for (const nom of ['open', 'openSync']) {
     return orig(p, flags, ...r);
   };
 }
+// Même chose pour les fonctions fs.promises (utilisées par la lecture de tous les fichiers).
+const promesses = {};
+for (const nom of ['writeFile', 'appendFile', 'unlink', 'rename', 'mkdir', 'rm', 'rmdir', 'copyFile', 'truncate', 'utimes', 'chmod', 'symlink']) {
+  promesses[nom] = fs.promises[nom];
+  fs.promises[nom] = async (...args) => { tentatives.push(`fs.promises.${nom}(${String(args[0])})`); throw new Error('écriture interdite'); };
+}
+const remettre = () => {
+  for (const [nom, f] of Object.entries(originaux)) fs[nom] = f;
+  for (const [nom, f] of Object.entries(promesses)) fs.promises[nom] = f;
+};
 // Les commandes lancées par l'app sont notées ; l'identité du disque est simulée (un dossier n'est pas un vrai disque).
 const commandes = [];
 const execFileOrig = cp.execFile;
@@ -73,7 +83,11 @@ async function main() {
     const disk = require('../src/disk');
     let lu;
     for (let i = 0; i < 20; i++) lu = await disk.lireDisque(dossier);
-    for (const [nom, f] of Object.entries(originaux)) fs[nom] = f;
+    // Lecture de tous les dossiers et fichiers (Contenu et doublons), 5 fois.
+    const scan = require('../src/scan');
+    let tout;
+    for (let i = 0; i < 5; i++) tout = await scan.scanner(dossier);
+    remettre();
     cp.execFile = execFileOrig;
 
     const apres = empreintes();
@@ -82,6 +96,7 @@ async function main() {
 
     console.log(`\nFaux SSD : ${Object.keys(fichiers).length} fichiers (${Object.values(fichiers).reduce((a, b) => a + b)} Mo), lu 20 fois`);
     console.log(`Dossiers vus par l'app : ${lu ? lu.dossiers.join(', ') : 'aucun'}`);
+    console.log(`Fichiers lus (5 fois)  : ${tout.fichiers.map(([c]) => c).join(', ')}`);
     console.log(`Tentatives d'écriture  : ${tentatives.length ? tentatives.join(' ; ') : 'aucune ✓'}`);
     console.log(`Commandes système      : ${commandes.length} lecture(s) seule(s) (Get-Partition / Get-Disk)${interdites.length ? ' — AUTRES : ' + interdites.join(' ; ') : ' ✓'}`);
     console.log(`Fichiers modifiés      : ${modifies.length ? modifies.join(' ; ') : 'aucun, tous identiques octet par octet ✓'}`);
@@ -89,7 +104,7 @@ async function main() {
     console.log(ok ? '\nRÉSULTAT : RÉUSSI — le SSD n\'a pas été touché.' : '\nRÉSULTAT : ÉCHEC');
     process.exitCode = ok ? 0 : 1;
   } finally {
-    for (const [nom, f] of Object.entries(originaux)) fs[nom] = f;
+    remettre();
     cp.execFile = execFileOrig;
     fs.rmSync(dossier, { recursive: true, force: true });
   }

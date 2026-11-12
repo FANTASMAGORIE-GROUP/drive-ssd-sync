@@ -68,6 +68,11 @@
   input { font: inherit; width: 100%; border: 1.5px solid var(--trait); border-radius: 14px; padding: 12px 14px; margin-top: 12px;
     outline: none; background: var(--fond); color: var(--texte); user-select: text; transition: border-color .2s, box-shadow .2s; }
   input:focus { border-color: var(--rose); box-shadow: 0 0 0 4px var(--rose-pale); }
+  #ecran > .carte { overflow-y: auto; min-height: 0; }
+  .bloc { text-align: left; background: var(--fond-2); border-radius: 14px; padding: 10px 12px; margin-top: 12px; font-size: 12.5px; line-height: 1.45; }
+  .bloc b { display: block; font-size: 12px; margin-bottom: 3px; }
+  .bloc .extrait { white-space: pre-line; color: var(--doux); display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
+  .bloc button.lien { padding: 6px 0 0; font-size: 12.5px; }
   .actions { display: flex; flex-direction: column; gap: 9px; margin-top: 20px; }
   button { font: inherit; font-weight: 600; border: 0; border-radius: 14px; padding: 13px 18px; cursor: pointer;
     display: inline-flex; align-items: center; justify-content: center; gap: 9px; color: #fff;
@@ -142,6 +147,7 @@
   <footer class="cache" id="bas">
     <button class="lien" id="btn-ouvrir"></button>
     <button class="lien" id="btn-changer"></button>
+    <button class="lien" id="btn-cle"></button>
   </footer>
 
 <script>
@@ -166,11 +172,11 @@ const ico = (nom, classe = '') => `<svg class="i ${classe}" viewBox="0 0 24 24">
 // Hors de l'app (aperçu dans un navigateur), une fausse API permet de voir chaque écran.
 if (!window.app) {
   const faux = [
-    { numero: '1', capacite: '2', pourcent: '82,5', localisation: 'TOM', projets: 'IFIS', relie: true },
-    { numero: '2', capacite: '2', pourcent: '96', localisation: 'Fantasmagorie > Salon', projets: 'CreativGen', relie: true },
+    { numero: '1', capacite: '2', pourcent: '82,5', localisation: 'TOM', projets: 'IFIS', relie: true, ligne: 1 },
+    { numero: '2', capacite: '2', pourcent: '96', localisation: 'Fantasmagorie > Salon', projets: 'CreativGen', relie: true, ligne: 2 },
     { numero: '3', capacite: '2', pourcent: '94', localisation: 'Fantasmagorie > Salon', projets: 'PB Noël', relie: false, doublon: true, ligne: 3 },
     { numero: '3', capacite: '2', pourcent: '79', localisation: 'TOM', projets: 'IFIS', relie: false, doublon: true, ligne: 4 },
-    { numero: '5', capacite: '1', pourcent: '56,6', localisation: 'TOM', projets: 'Hypnos', relie: false },
+    { numero: '5', capacite: '1', pourcent: '56,6', localisation: 'TOM', projets: 'Hypnos', relie: false, ligne: 5 },
   ];
   const ssd = { disque: { modele: 'Samsung T7 Shield 2 To', total_to: 2, utilise_to: 1.42, restant_to: 0.58, pourcent: 71 }, numero: null };
   const attendre = (ms) => new Promise((ok) => setTimeout(ok, ms));
@@ -178,12 +184,23 @@ if (!window.app) {
     etatInitial: async () => ({ connecte: true, sheetId: 'x', titre: 'LES DISQUES DURS', nom: 'Anne', cleOpenai: true }),
     disques: async () => { await attendre(300); return faux; },
     attendre: async () => { setTimeout(() => window.__ssd && window.__ssd(ssd), 2500); return null; },
-    liberer: async () => {}, synchroniser: async (n) => { await attendre(1800); return { numero: n, ecrits: ['Capacité (En To)', 'Utilisé', 'Restant', '%', 'Projets'] }; },
+    liberer: async () => {},
+    synchroniser: async (n) => {
+      for (const m of ['Je lis tous les dossiers du SSD…', '12 500 fichiers lus…', 'Je résume le contenu…', 'Je cherche les doublons…']) { window.__progres?.(m); await attendre(600); }
+      return { numero: n, ecrits: ['Capacité (En To)', 'Utilisé', 'Restant', '%', 'Projets'], analyse: {
+        fichiers: 12873,
+        contenu: { texte: 'CLIP LUMIÈRE : - Rush A7SIII - Son - Export\nPUB MAISON VERTE : - Montage - Photos', ecrit: false, actuel: 'Écrit à la main par Anne' },
+        doublons: { memeSsd: 2, autresSsd: 5, perduGo: 38.4, avec: ['4', '7'], total: 12 },
+      } };
+    },
+    changerNumero: async (ligne, ancien, n) => { await attendre(400); faux.find((x) => x.ligne === ligne && x.numero === ancien).numero = n; return n; },
+    cleOpenai: async (k) => { await attendre(800); if (k !== 'sk-bonne-cle-de-test') throw new Error('OpenAI refuse cette clé : elle est fausse, expirée ou supprimée'); },
+    ecrireContenu: async () => attendre(400), ouvrirDoublons: async () => {}, surProgres: (fn) => { window.__progres = fn; },
     verifier: async (n) => (n === '1' ? { autre: { modele: 'SanDisk Extreme 2 To', date: '03/11/2026' }, ecart: null }
       : n === '2' ? { autre: null, ecart: { fichier: 4, mesure: 2 } } : { autre: null, ecart: null }),
     renumeroter: async (ligne) => { const d = faux.find((x) => x.ligne === ligne); d.numero = '6'; faux.forEach((x) => { x.doublon = false; }); return '6'; },
     ajouter: async () => { await attendre(1800); return { numero: '4', ecrits: ['Capacité (En To)', 'Utilisé', 'Restant', '%', 'Projets'] }; },
-    ouvrirFichier: async () => {}, changerFichier: async () => {}, connecter: async () => {}, choisirFichier: async () => 'X', nom: async () => {}, cleOpenai: async () => {},
+    ouvrirFichier: async () => {}, changerFichier: async () => {}, connecter: async () => {}, choisirFichier: async () => 'X', nom: async () => {},
     surSsd: (fn) => { window.__ssd = fn; }, surRetrait: () => {}, surErreur: () => {},
   };
 }
@@ -253,16 +270,38 @@ function ecranFichier() {
   };
 }
 
-function ecranCle() {
+// Première clé, ou changement de clé depuis le bas de l'app. L'ancienne clé n'est jamais affichée :
+// l'app la garde chiffrée et ne la renvoie pas à l'interface. La nouvelle est vérifiée auprès d'OpenAI avant d'être gardée.
+function ecranCle(changer = false) {
   afficher('reglage', `${illus('cle')}
-    <p class="titre">Dernière étape</p>
-    <p class="texte">Colle la clé OpenAI. C'est à faire une seule fois.</p>
-    <input id="cle" type="password" placeholder="sk-…">
-    ${boutons([['ok', null, 'Enregistrer']])}`);
-  $('ok').onclick = async () => {
-    try { await window.app.cleOpenai($('cle').value.trim()); etat.cleOpenai = true; suivant(); }
-    catch (e) { erreur(e.message); }
+    <p class="titre">${changer ? 'Changer la clé OpenAI' : 'Dernière étape'}</p>
+    <p class="texte">${changer
+      ? "Colle la nouvelle clé. L'ancienne reste en place tant que la nouvelle n'a pas été acceptée par OpenAI."
+      : "Colle la clé OpenAI. C'est à faire une seule fois."}</p>
+    <input id="cle" type="password" placeholder="sk-…" autocomplete="off" spellcheck="false">
+    ${boutons([['ok', null, 'Vérifier et enregistrer'], ...(changer ? [['retour', 'retour', 'Retour à la liste', 'second']] : [])])}`);
+  const champ = $('cle');
+  champ.focus();
+  const valider = async () => {
+    if ($('ok').disabled) return;
+    $('ok').disabled = true;
+    $('ok').textContent = 'Je vérifie la clé auprès d\'OpenAI…';
+    erreur('');
+    try {
+      await window.app.cleOpenai(champ.value.trim());
+      champ.value = '';
+      etat.cleOpenai = true;
+      await suivant();
+      $('puce').innerHTML += '<span>· nouvelle clé OpenAI enregistrée</span>';
+    } catch (e) {
+      $('ok').disabled = false;
+      $('ok').textContent = 'Vérifier et enregistrer';
+      erreur(e.message);
+    }
   };
+  $('ok').onclick = valider;
+  champ.onkeydown = (e) => { if (e.key === 'Enter') valider(); };
+  if (changer) $('retour').onclick = ecranListe;
 }
 
 // ---------- Liste des disques ----------
@@ -330,8 +369,9 @@ function ecranDoublon(numero, ligne) {
     <p class="titre">Plusieurs disques portent le n°${echapper(numero)}</p>
     <p class="texte">L'app ne peut pas savoir lequel remplir. Je peux donner à celui-ci le premier numéro libre :
       seule la case du numéro change, le reste de la ligne ne bouge pas.</p>
-    ${boutons([['corriger', 'coche', 'Corriger automatiquement'], ['ouvrir', 'fichier', 'Corriger moi-même dans le fichier', 'second'],
+    ${boutons([['corriger', 'coche', 'Corriger automatiquement'], ['choisir', null, 'Choisir le numéro moi-même', 'second'],
     ['retour', 'retour', 'Retour à la liste', 'second']])}`);
+  $('choisir').onclick = () => ecranNumero(ligne, numero);
   $('corriger').onclick = async () => {
     try {
       const nouveau = await window.app.renumeroter(ligne);
@@ -340,7 +380,29 @@ function ecranDoublon(numero, ligne) {
       $('puce').innerHTML += `<span>· disque renuméroté n°${echapper(nouveau)}</span>`;
     } catch (e) { erreur(e.message); }
   };
-  $('ouvrir').onclick = () => window.app.ouvrirFichier();
+  $('retour').onclick = ecranListe;
+}
+
+// Changer le n° d'un disque : seule la case du n° change, le SSD reste relié à sa ligne.
+function ecranNumero(ligne, ancien) {
+  afficher('numero', `${illus('disque')}
+    <p class="titre">Changer le n° du disque ${echapper(ancien)}</p>
+    <p class="texte">Le SSD reste relié à cette ligne, seul le numéro change dans le fichier.</p>
+    <input id="numero" value="${echapper(ancien)}" maxlength="20">
+    ${boutons([['ok', 'coche', 'Enregistrer'], ['retour', 'retour', 'Retour à la liste', 'second']])}`);
+  const champ = $('numero');
+  champ.focus();
+  champ.select();
+  const enregistrer = async () => {
+    $('ok').disabled = true;
+    try {
+      const nouveau = await window.app.changerNumero(ligne, ancien, champ.value.trim());
+      await ecranListe();
+      $('puce').innerHTML += `<span>· disque ${echapper(ancien)} → n°${echapper(nouveau)}</span>`;
+    } catch (e) { $('ok').disabled = false; erreur(e.message); }
+  };
+  $('ok').onclick = enregistrer;
+  champ.onkeydown = (e) => { if (e.key === 'Enter') enregistrer(); };
   $('retour').onclick = ecranListe;
 }
 
@@ -357,8 +419,9 @@ async function ecranAttente(numero) {
     ${rappel ? `<p class="rappel">${echapper(rappel)}</p>` : ''}
     <p class="texte">J'attends qu'il apparaisse sur l'ordinateur</p>
     <div class="points"><i></i><i></i><i></i></div>
-    ${boutons([['retour', 'retour', 'Retour à la liste', 'second']])}`);
+    ${boutons([['retour', 'retour', 'Retour à la liste', 'second'], ...(info ? [['changer', null, 'Changer le n° de ce disque', 'second']] : [])])}`);
   $('retour').onclick = ecranListe;
+  if (info) $('changer').onclick = () => ecranNumero(info.ligne, info.numero);
   const deja = await window.app.attendre(numero);
   if (deja && vue === 'attente') surSsd(deja);
 }
@@ -422,16 +485,55 @@ function ecranAutre(b) {
   $('retour').onclick = ecranListe;
 }
 
+window.app.surProgres((m) => { if (vue === 'travail' && $('progres')) $('progres').textContent = m; });
+
+// Contenu proposé par l'IA et doublons trouvés, sous le résultat de la synchronisation.
+function blocsAnalyse(a, numero) {
+  if (!a) return '';
+  if (a.erreur) return `<div class="bloc"><b>Lecture des fichiers impossible</b>${echapper(a.erreur)}</div>`;
+  let html = '';
+  if (a.contenu) {
+    html += `<div class="bloc"><b>${a.contenu.ecrit ? 'Contenu rempli' : 'Contenu proposé (la case était déjà remplie, je n\'y ai pas touché)'}</b>
+      <span class="extrait">${echapper(a.contenu.texte)}</span>
+      ${a.contenu.ecrit ? '' : '<button class="lien" id="remplacer">Remplacer la case Contenu par ce texte</button>'}</div>`;
+  } else if (a.contenuErreur) {
+    html += `<div class="bloc"><b>Contenu non rempli</b>${echapper(a.contenuErreur)}</div>`;
+  }
+  const d = a.doublons;
+  if (d) {
+    const rien = !d.memeSsd && !d.autresSsd;
+    html += `<div class="bloc"><b>${rien ? 'Aucun doublon' : `Doublons : ${fr(d.perduGo)} Go en trop`}</b>
+      ${rien ? `${a.fichiers.toLocaleString('fr-FR')} fichiers lus, aucun n'est en double.`
+        : [d.memeSsd && `${d.memeSsd} fichier${d.memeSsd > 1 ? 's' : ''} en double dans ce disque`,
+          d.autresSsd && `${d.autresSsd} fichier${d.autresSsd > 1 ? 's' : ''} aussi sur ${d.avec.length > 1 ? 'les disques' : 'le disque'} ${d.avec.map((n) => `n°${echapper(n)}`).join(', ')}`]
+          .filter(Boolean).join(' · ')}
+      ${d.total ? '<button class="lien" id="voir-doublons">Voir tous les doublons dans le fichier</button>' : ''}</div>`;
+  } else if (a.doublonsErreur) {
+    html += `<div class="bloc"><b>Doublons non vérifiés</b>${echapper(a.doublonsErreur)}</div>`;
+  }
+  return html;
+}
+
 async function travailler(action) {
-  afficher('travail', `<div class="anneau"></div><p class="titre">Je remplis le fichier</p><p class="texte">Ça prend quelques secondes</p>`);
+  afficher('travail', `<div class="anneau"></div><p class="titre">Je remplis le fichier</p><p class="texte" id="progres">Ça prend quelques secondes</p>`);
   try {
     const r = await action();
     afficher('fini', `<div class="illus vert">${ico('coche', 'coche')}</div>
       <p class="titre">Disque n°${echapper(r.numero)} synchronisé</p>
       <p class="texte">${r.ecrits.length ? `Mis à jour : ${r.ecrits.map(echapper).join(', ')}` : "Rien n'avait changé"}<br>Une ligne a été ajoutée dans les emprunts.</p>
+      ${blocsAnalyse(r.analyse, r.numero)}
       ${boutons([['retour', 'retour', 'Retour à la liste'], ['ouvrir', 'fichier', 'Voir le fichier', 'second']])}`);
     $('ouvrir').onclick = () => window.app.ouvrirFichier();
     $('retour').onclick = ecranListe;
+    if ($('voir-doublons')) $('voir-doublons').onclick = () => window.app.ouvrirDoublons();
+    if ($('remplacer')) {
+      $('remplacer').onclick = async () => {
+        try {
+          await window.app.ecrireContenu(r.numero, r.analyse.contenu.texte);
+          $('remplacer').outerHTML = '<span style="display:block;padding-top:6px;color:var(--vert);font-weight:600">Case Contenu remplacée</span>';
+        } catch (e) { erreur(e.message); }
+      };
+    }
   } catch (e) {
     await ecranListe();
     erreur(e.message);
@@ -453,6 +555,8 @@ function suivant() {
 
 $('btn-ouvrir').innerHTML = `${ico('fichier')}Ouvrir le fichier`;
 $('btn-changer').innerHTML = `${ico('reglage')}Changer de fichier`;
+$('btn-cle').innerHTML = `${ico('cle')}Clé OpenAI`;
+$('btn-cle').onclick = () => ecranCle(true);
 $('btn-ouvrir').onclick = () => window.app.ouvrirFichier();
 $('btn-changer').onclick = async () => {
   await window.app.changerFichier();
