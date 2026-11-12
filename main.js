@@ -6,8 +6,9 @@ const ai = require('./src/ai');
 const store = require('./src/store');
 const scan = require('./src/scan');
 const doublons = require('./src/doublons');
+const { numeroDansNom } = require('./src/numero');
 const { styleGeneral } = require('./src/style');
-const { proteger, validerMaj } = require('./src/garde');
+const { proteger, majDirecte } = require('./src/garde');
 const maj = require('./src/maj');
 
 const { sheets } = google;
@@ -175,11 +176,12 @@ async function lier(id, d, numero) {
 }
 
 // Nouveau disque : première ligne vide sous les titres (colonnes A à J, sans compter le bloc de statistiques).
-async function nouvelleLigne(id) {
+// numero absent : à la suite des autres (le plus grand n° + 1).
+async function nouvelleLigne(id, voulu = null) {
   const { general } = await onglets(id);
   const lignes = await sheets.lire(id, general, 'A1:J300', 'FORMATTED_VALUE');
   const t = ligneTitres(lignes);
-  const numero = String(Math.max(0, ...lignes.slice(t + 1).map((l) => parseInt(l[0], 10) || 0)) + 1);
+  const numero = voulu || String(Math.max(0, ...lignes.slice(t + 1).map((l) => parseInt(l[0], 10) || 0)) + 1);
   let i = lignes.findIndex((l, n) => n > t && !l.some((c) => String(c ?? '').trim()));
   if (i < 0) i = lignes.length;
   await sheets.ecrire(id, general, `A${i + 1}`, [[Number(numero)]]);
@@ -195,13 +197,15 @@ async function remplir(id, d, numero) {
   if (index < 0) throw new Error(`Le disque n°${numero} n'existe pas dans l'onglet ${general}`);
   const ligne = lignes[index];
 
-  const { volume, serial, ...infos } = d;
-  const maj = validerMaj(await ai.proposerMaj(entetes, ligne, infos), infos);
+  // Les mesures sont écrites telles quelles, sans passer par l'IA : une IA qui « nettoie » un nom de dossier
+  // (espace en trop, accents à la Mac) faisait refuser toute la colonne Projets.
+  const maj = majDirecte(entetes, d);
   const ecrits = [];
   for (const [entete, valeur] of Object.entries(maj)) {
     const col = entetes.findIndex((e) => String(e).trim() === entete.trim());
     if (col < 0 || INTOUCHABLES.test(entete)) continue;
     if (String(ligne[col] ?? '').startsWith('=')) continue; // ne jamais écraser une formule
+    if (String(ligne[col] ?? '') === String(valeur)) continue; // rien n'a changé
     await sheets.ecrire(id, general, `${lettre(col)}${index + 1}`, [[proteger(valeur)]]);
     ecrits.push(entete.trim());
   }
@@ -377,14 +381,57 @@ ipcMain.handle('synchroniser', async (_e, numero, forcer = false) => {
   return { numero, ecrits, analyse: await analyserSansBloquer(sheetId(), disque, numero) };
 });
 
-ipcMain.handle('ajouter', async () => {
+// Nouveau SSD : quel n° proposer ? Celui écrit dans son nom (« SSD 12 ») s'il y en a un, sinon la suite des autres.
+// occupant : ce qu'il y a déjà dans le fichier à ce n° (rien, une ligne sans SSD relié, un autre SSD, plusieurs lignes).
+async function proposition(id, d) {
+  const disques = await disquesDuFichier(id);
+  const suite = String(Math.max(0, ...disques.map((x) => parseInt(x.numero, 10) || 0)) + 1);
+  const numeroNom = numeroDansNom(d.nom);
+  const base = { nom: d.nom || '', suite, numeroNom };
+  if (!numeroNom) return base;
+  const occ = disques.filter((x) => x.numero === numeroNom);
+  if (!occ.length) return { ...base, occupant: null };
+  if (occ.length > 1) return { ...base, occupant: { etat: 'doublon' } };
+  const lien = (await liens(id)).find((l) => l.ligne === occ[0].ligne);
+  const etat = !lien || !lien.serial ? 'non-relie' : lien.serial === d.serial ? 'meme' : 'autre-ssd';
+  const { ligne, capacite, localisation, projets } = occ[0];
+  return { ...base, occupant: { etat, ligne, capacite, localisation, projets, modele: lien?.modele || '', date: lien?.date || '' } };
+}
+
+ipcMain.handle('proposition', () => {
   if (!branche) throw new Error('Le SSD a été débranché');
-  const numero = await nouvelleLigne(sheetId());
-  await lier(sheetId(), branche.disque, numero);
-  branche.numero = numero;
+  return proposition(sheetId(), branche.disque);
+});
+
+// choix.numero : le n° lu dans le nom ; choix.prendre : il est pris par un autre SSD, qui passe à la suite.
+ipcMain.handle('ajouter', async (_e, choix = {}) => {
+  if (!branche) throw new Error('Le SSD a été débranché');
+  const id = sheetId();
   const { disque } = branche;
-  const ecrits = await remplir(sheetId(), disque, numero);
-  return { numero, ecrits, analyse: await analyserSansBloquer(sheetId(), disque, numero) };
+  let numero;
+  let deplace = null;
+  if (choix.numero) {
+    // On revérifie : le fichier a pu changer depuis l'affichage des boutons.
+    const p = await proposition(id, disque);
+    if (p.numeroNom !== choix.numero) throw new Error('Le nom du SSD a changé : débranche-le et rebranche-le');
+    const etat = p.occupant?.etat;
+    if (etat === 'doublon') throw new Error(`Plusieurs disques portent déjà le n°${choix.numero} : corrige-les d'abord`);
+    if (etat === 'non-relie' || etat === 'meme') throw new Error(`Le disque n°${choix.numero} existe déjà dans le fichier : relie-le plutôt`);
+    if (etat === 'autre-ssd') {
+      if (!choix.prendre) throw new Error(`Le n°${choix.numero} est déjà pris par un autre SSD`);
+      // Seule la case du n° de l'autre disque change ; sa ligne et son SSD restent ensemble.
+      const { general } = await onglets(id);
+      await sheets.ecrire(id, general, `A${p.occupant.ligne + 1}`, [[Number(p.suite)]]);
+      deplace = { de: choix.numero, vers: p.suite };
+    }
+    numero = await nouvelleLigne(id, choix.numero);
+  } else {
+    numero = await nouvelleLigne(id);
+  }
+  await lier(id, disque, numero);
+  branche.numero = numero;
+  const ecrits = await remplir(id, disque, numero);
+  return { numero, ecrits, deplace, analyse: await analyserSansBloquer(id, disque, numero) };
 });
 
 ipcMain.handle('renumeroter', (_e, ligne) => renumeroter(sheetId(), ligne));

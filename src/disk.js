@@ -16,8 +16,11 @@ function run(cmd, args) {
 // Mode test (npm run test:faux) : de faux SSD que l'app « branche » quand on lui demande un disque,
 // avec le délai d'un vrai branchement (montage par le système + lecture du numéro de série).
 const FAUX = process.argv.includes('--faux-ssd');
+// Noms des faux SSD : avec un n° libre, sans n°, avec un n° sûrement déjà pris, avec un n° glissé dans le nom.
+const NOMS_FAUX = ['', 'SSD 12', 'Samsung T7', 'SSD 1', 'DISQUE40'];
 const fauxDisque = (n, total, utilise, dossiers) => ({
   volume: `FAUX-SSD-${n}`,
+  nom: NOMS_FAUX[n],
   serial: `TEST-FAUX-SSD-000${n}`,
   modele: `Samsung T7 Shield ${total}To (faux n°${n})`,
   total_to: total,
@@ -77,12 +80,13 @@ function volumesMontes() {
 
 async function identiteWindows(volume) {
   const ps = `$d = Get-Partition -DriveLetter ${volume[0]} | Get-Disk; ` +
-    '[pscustomobject]@{s=$d.SerialNumber;u=$d.UniqueId;m=$d.FriendlyName;sys=($d.IsBoot -or $d.IsSystem)} | ConvertTo-Json';
+    `$n = (Get-Volume -DriveLetter ${volume[0]}).FileSystemLabel; ` +
+    '[pscustomobject]@{s=$d.SerialNumber;u=$d.UniqueId;m=$d.FriendlyName;n=$n;sys=($d.IsBoot -or $d.IsSystem)} | ConvertTo-Json';
   const out = await run('powershell', ['-NoProfile', '-Command', ps]);
   if (!out.trim()) return null;
   const d = JSON.parse(out);
   if (d.sys) return null;
-  return { serial: (d.s || '').trim() || d.u, modele: d.m };
+  return { serial: (d.s || '').trim() || d.u, modele: d.m, nom: (d.n || '').trim() };
 }
 
 function chercherSerial(noeud, bsd) {
@@ -112,7 +116,7 @@ async function identiteMac(volume) {
     if (sortie) serial = chercherSerial(JSON.parse(sortie), info.ParentWholeDisk);
     if (serial) break;
   }
-  return { serial: serial || info.VolumeUUID, modele: info.MediaName || '' };
+  return { serial: serial || info.VolumeUUID, modele: info.MediaName || '', nom: info.VolumeName || path.basename(volume) };
 }
 
 async function lireDisque(volume) {
@@ -125,12 +129,15 @@ async function lireDisque(volume) {
   const to = 1e12;
   const dossiers = fs.readdirSync(volume, { withFileTypes: true })
     .filter((e) => e.isDirectory() && !e.name.startsWith('.') && !IGNORES.has(e.name.toLowerCase()))
-    .map((e) => e.name)
+    // Même écriture partout : accents « à la Mac » recomposés, espaces en trop au début et à la fin enlevés.
+    .map((e) => e.name.normalize('NFC').trim())
+    .filter(Boolean)
     .sort((a, b) => a.localeCompare(b, 'fr'));
   return {
     volume,
     serial: ident.serial,
     modele: ident.modele,
+    nom: ident.nom || '',
     total_to: +(total / to).toFixed(2),
     utilise_to: +((total - libre) / to).toFixed(2),
     restant_to: +(libre / to).toFixed(2),

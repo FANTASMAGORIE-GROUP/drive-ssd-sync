@@ -40,7 +40,8 @@ async function parcourir(racine, surProgres) {
     for (let i = 0; i < aStat.length; i += 64) {
       const lot = aStat.slice(i, i + 64);
       const tailles = await Promise.all(lot.map((c) => fs.promises.stat(path.join(racine, c)).then((s) => s.size, () => null)));
-      lot.forEach((c, j) => { if (tailles[j] !== null) fichiers.push([c, tailles[j]]); });
+      // Chemins en écriture NFC : un même fichier lu sur Mac et sur Windows doit avoir le même nom pour les doublons.
+      lot.forEach((c, j) => { if (tailles[j] !== null) fichiers.push([c.normalize('NFC'), tailles[j]]); });
     }
     if (fichiers.length - dernier >= 500) { dernier = fichiers.length; surProgres(fichiers.length); }
   }

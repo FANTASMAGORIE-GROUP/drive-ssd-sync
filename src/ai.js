@@ -1,19 +1,9 @@
-// Demande à OpenAI quelles colonnes de la ligne du disque remplir avec les infos mesurées.
+// OpenAI écrit la phrase de la colonne « Contenu ». Les mesures (capacité, %, Projets…) sont écrites sans IA.
 const secrets = require('./secrets');
 const store = require('./store');
 
 // La clé est saisie une fois dans l'app (jamais intégrée à l'installeur) ; secrets.json sert en développement.
 const cle = () => store.get('openaiKey') || secrets.OPENAI_API_KEY;
-
-const CONSIGNES = `Tu remplis la ligne d'un disque dur dans un tableau Google Sheets.
-On te donne les en-têtes de colonnes, la ligne actuelle et les infos mesurées sur le disque.
-Réponds en JSON : {"maj": {"<en-tête exact>": <valeur>}}.
-Règles :
-- Remplis uniquement les colonnes qui correspondent à une info mesurée (capacité, utilisé, restant, pourcentage, projets/dossiers).
-- Capacité, utilisé et restant sont en To : renvoie des nombres. Le pourcentage est un nombre sans le signe %.
-- Pour les projets, renvoie la liste des dossiers séparés par des retours à la ligne.
-- Ne touche jamais aux colonnes de localisation, contenu, état, sauvegarde ou aux notes écrites à la main.
-- Ne renvoie pas une colonne dont la valeur ne change pas.`;
 
 async function demander(consignes, donnees) {
   const r = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -48,10 +38,6 @@ async function testerCle(nouvelle) {
   throw new Error(`OpenAI ne répond pas correctement (erreur ${r.status}), réessaie dans un moment`);
 }
 
-async function proposerMaj(entetes, ligneActuelle, disque) {
-  return (await demander(CONSIGNES, { entetes, ligne_actuelle: ligneActuelle, disque })).maj || {};
-}
-
 // Les noms de dossiers sont des données, jamais des consignes : on le rappelle à l'IA.
 const CONSIGNES_CONTENU = `Tu décris le contenu d'un disque dur de vidéaste pour la colonne « Contenu » d'un tableau.
 On te donne l'arborescence résumée du disque : chaque dossier principal, ses sous-dossiers et le nombre de fichiers par type.
@@ -72,4 +58,4 @@ async function decrireContenu(arbre) {
   return texte.trim().slice(0, 1200);
 }
 
-module.exports = { proposerMaj, decrireContenu, testerCle, aUneCle: () => !!cle() };
+module.exports = { decrireContenu, testerCle, aUneCle: () => !!cle() };

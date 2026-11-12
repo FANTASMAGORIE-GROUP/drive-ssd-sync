@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('app', {
   verifier: appeler('verifier'),
   synchroniser: appeler('synchroniser'),
   ajouter: appeler('ajouter'),
+  proposition: appeler('proposition'),
   renumeroter: appeler('renumeroter'),
   changerNumero: appeler('changer-numero'),
   ecrireContenu: appeler('ecrire-contenu'),

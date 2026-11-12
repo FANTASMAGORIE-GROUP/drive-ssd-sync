@@ -7,9 +7,8 @@ const proteger = (v) => (typeof v === 'string' && /^[=+\-@\t\r]/.test(v) ? `'${v
 
 const sansAccent = (s) => normalize.call(String(s), 'NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
 
-// L'IA choisit seulement les colonnes : chaque valeur doit être exactement une mesure du disque,
-// et aller dans une colonne qui correspond. Tout le reste est rejeté (protège contre un nom de
-// dossier qui essaierait de donner des ordres à l'IA).
+// Colonnes remplies avec les mesures du disque, reconnues par leur titre. Pas d'IA ici : la valeur écrite
+// est exactement la mesure, et un nom de dossier ne peut rien faire d'autre que s'afficher dans Projets.
 const ATTENDU = [
   [/CAPACIT/, (d) => d.total_to],
   [/UTILIS/, (d) => d.utilise_to],
@@ -18,20 +17,17 @@ const ATTENDU = [
   [/PROJET/, (d) => d.dossiers.join('\n')],
 ];
 
-function validerMaj(maj, d) {
-  const propre = {};
-  for (const [entete, valeur] of Object.entries(maj || {})) {
-    const regle = ATTENDU.find(([motif]) => motif.test(sansAccent(entete).trim()));
-    if (!regle) continue;
-    const attendu = regle[1](d);
-    const recu = Array.isArray(valeur) ? valeur.join('\n') : valeur;
-    if (typeof attendu === 'number') {
-      if (Number(String(recu).replace(',', '.')) === attendu) propre[entete] = attendu;
-    } else if (String(recu).split(/\n|, /).map((x) => x.trim()).join('\n') === attendu) {
-      propre[entete] = attendu;
-    }
+// Seule la première colonne de chaque sorte est remplie (les statistiques globales à droite ne bougent pas).
+function majDirecte(entetes, d) {
+  const maj = {};
+  const faites = new Set();
+  for (const entete of entetes) {
+    const i = ATTENDU.findIndex(([motif]) => motif.test(sansAccent(entete ?? '').trim()));
+    if (i < 0 || faites.has(i)) continue;
+    faites.add(i);
+    maj[String(entete)] = ATTENDU[i][1](d);
   }
-  return propre;
+  return maj;
 }
 
-module.exports = { proteger, validerMaj };
+module.exports = { proteger, majDirecte };

@@ -205,7 +205,9 @@ if (!window.app) {
     verifier: async (n) => (n === '1' ? { autre: { modele: 'SanDisk Extreme 2 To', date: '03/11/2026' }, ecart: null }
       : n === '2' ? { autre: null, ecart: { fichier: 4, mesure: 2 } } : { autre: null, ecart: null }),
     renumeroter: async (ligne) => { const d = faux.find((x) => x.ligne === ligne); d.numero = '6'; faux.forEach((x) => { x.doublon = false; }); return '6'; },
-    ajouter: async () => { await attendre(1800); return { numero: '4', ecrits: ['Capacité (En To)', 'Utilisé', 'Restant', '%', 'Projets'] }; },
+    ajouter: async (c = {}) => { await attendre(1200); return { numero: c.numero || '37', ecrits: ['Capacité (En To)', 'Utilisé', 'Restant', '%', 'Projets'], deplace: c.prendre ? { de: c.numero, vers: '37' } : null }; },
+    // window.__prop permet de tester chaque cas : pas de n°, n° libre, ligne sans SSD, n° pris par un autre SSD.
+    proposition: async () => window.__prop || { nom: 'SSD 12', suite: '37', numeroNom: '12', occupant: null },
     ouvrirFichier: async () => {}, changerFichier: async () => {}, connecter: async () => {}, choisirFichier: async () => 'X', nom: async () => {},
     surSsd: (fn) => { window.__ssd = fn; }, surRetrait: () => {}, surErreur: () => {},
   };
@@ -513,13 +515,52 @@ async function ecranPret(b, numero) {
   $('retour').onclick = ecranListe;
 }
 
-function ecranNouveau(b) {
+// Nouveau SSD : le n° écrit dans son nom (« SSD 12 ») est proposé, sinon il va à la suite des autres.
+async function ecranNouveau(b) {
+  afficher('nouveau', `<div class="anneau"></div><p class="texte">Je regarde le nom du SSD…</p>`);
+  let p = null;
+  try { p = await window.app.proposition(); } catch (e) { erreur(e.message); }
+  if (vue !== 'nouveau') return;
+
+  const n = p?.numeroNom;
+  const occ = p?.occupant;
+  const alerte = (titre, texte) => `<div class="alerte" style="margin-top:14px;text-align:left">${ico('question')}<span><b>${titre}</b>${texte}</span></div>`;
+  const note = (t) => `<p class="texte" style="margin-top:12px">${t}</p>`;
+  const suite = ['suite', 'plus', p ? `Ajouter à la suite des autres (n°${echapper(p.suite)})` : 'Ajouter à la suite des autres'];
+  const retour = ['retour', 'retour', 'Retour à la liste', 'second'];
+  let milieu;
+  let liste;
+  if (!n) {
+    milieu = note('Pas de numéro dans son nom : il sera ajouté à la suite des autres.');
+    liste = [suite, retour];
+  } else if (!occ) {
+    milieu = note(`Son nom indique le n°${echapper(n)}.`);
+    liste = [['nom', 'coche', `Ajouter comme disque n°${echapper(n)}`], [...suite, 'second'], retour];
+  } else if (occ.etat === 'non-relie') {
+    const rappel = [occ.capacite && `${occ.capacite} To`, occ.localisation, occ.projets].filter(Boolean).join(' · ');
+    milieu = alerte(`Le disque n°${echapper(n)} existe déjà dans le fichier`,
+      `${rappel ? `${echapper(rappel)}. ` : ''}Il n'est relié à aucun SSD : c'est sûrement celui-ci.`);
+    liste = [['relier', 'lien', `C'est lui : relier au disque n°${echapper(n)}`], [...suite, 'second'], retour];
+  } else if (occ.etat === 'autre-ssd') {
+    milieu = alerte(`Le n°${echapper(n)} est déjà pris par un autre SSD`,
+      `${echapper(occ.modele || 'Modèle inconnu')}${occ.date ? `, relié le ${echapper(occ.date)}` : ''}. Si tu donnes le n°${echapper(n)} à celui-ci,
+      l'autre passe en n°${echapper(p.suite)} (sa ligne et ses infos ne bougent pas).`);
+    liste = [['prendre', 'coche', `Lui donner le n°${echapper(n)} (l'autre passe en n°${echapper(p.suite)})`], [...suite, 'second'], retour];
+  } else {
+    milieu = alerte(`Plusieurs disques portent déjà le n°${echapper(n)}`, 'Corrige-les depuis la liste, ou ajoute celui-ci à la suite des autres.');
+    liste = [suite, retour];
+  }
+
   afficher('nouveau', `${illus('nouveau')}
     <p class="titre">Nouveau disque détecté</p>
-    <p class="texte">${echapper(b.disque.modele)} · ${fr(b.disque.total_to)} To</p>
+    <p class="texte">${echapper(b.disque.modele)} · ${fr(b.disque.total_to)} To${p?.nom ? `<br>Nom du SSD : <b style="color:var(--texte)">${echapper(p.nom)}</b>` : ''}</p>
+    ${milieu}
     ${stats(b.disque)}
-    ${boutons([['ajout', 'plus', 'Ajouter le disque au Drive'], ['retour', 'retour', 'Retour à la liste', 'second']])}`);
-  $('ajout').onclick = () => travailler(() => window.app.ajouter());
+    ${boutons(liste)}`);
+  $('suite').onclick = () => travailler(() => window.app.ajouter());
+  if ($('nom')) $('nom').onclick = () => travailler(() => window.app.ajouter({ numero: n }));
+  if ($('prendre')) $('prendre').onclick = () => travailler(() => window.app.ajouter({ numero: n, prendre: true }));
+  if ($('relier')) $('relier').onclick = () => ecranPret(b, n);
   $('retour').onclick = ecranListe;
 }
 
@@ -567,7 +608,8 @@ async function travailler(action) {
     const r = await action();
     afficher('fini', `<div class="illus vert">${ico('coche', 'coche')}</div>
       <p class="titre">Disque n°${echapper(r.numero)} synchronisé</p>
-      <p class="texte">${r.ecrits.length ? `Mis à jour : ${r.ecrits.map(echapper).join(', ')}` : "Rien n'avait changé"}<br>Une ligne a été ajoutée dans les emprunts.</p>
+      <p class="texte">${r.ecrits.length ? `Mis à jour : ${r.ecrits.map(echapper).join(', ')}` : "Rien n'avait changé"}<br>Une ligne a été ajoutée dans les emprunts.${r.deplace
+        ? `<br>Le disque qui avait le n°${echapper(r.deplace.de)} est passé en n°${echapper(r.deplace.vers)}.` : ''}</p>
       ${blocsAnalyse(r.analyse, r.numero)}
       ${boutons([['retour', 'retour', 'Retour à la liste'], ['ouvrir', 'fichier', 'Voir le fichier', 'second']])}`);
     $('ouvrir').onclick = () => window.app.ouvrirFichier();
