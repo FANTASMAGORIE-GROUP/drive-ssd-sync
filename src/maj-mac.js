@@ -20,24 +20,24 @@ const lancer = (cmd, args) => new Promise((ok, ko) => {
   execFile(cmd, args, { timeout: 180000 }, (e, sortie, err) => (e ? ko(new Error(`${cmd} : ${(err || e.message).trim()}`)) : ok(sortie)));
 });
 
-// Dernière version publiée qui a bien son .dmg, avec l'empreinte du .dmg lue dans latest-mac.yml.
+// Dernière version publiée, lue dans latest-mac.yml de la dernière release : version, taille et empreinte
+// du .dmg. Pas d'API GitHub (limitée à 60 requêtes par heure et par adresse internet). Ce fichier n'existe
+// qu'une fois la release rendue visible, donc complète : jamais de version annoncée sans son .dmg.
 async function derniereVersion() {
-  const r = await fetch(`https://api.github.com/repos/${DEPOT}/releases/latest`, { headers: { Accept: 'application/vnd.github+json' } });
+  const r = await fetch(`https://github.com/${DEPOT}/releases/latest/download/latest-mac.yml`, { redirect: 'follow' });
   if (!r.ok) return null;
-  const sortie = await r.json();
-  const version = String(sortie.tag_name || '').replace(/^v/, '');
-  const assets = sortie.assets || [];
-  const dmg = assets.find((a) => a.name === DMG && a.state === 'uploaded');
-  const yml = assets.find((a) => a.name === 'latest-mac.yml' && a.state === 'uploaded');
-  if (!version || !dmg) return null;
-  let sha512 = null;
-  if (yml) {
-    const texte = await (await fetch(yml.browser_download_url)).text();
-    // Bloc « - url: SSD-Drive-Sync-Mac.dmg » puis sa ligne « sha512: … »
-    const bloc = texte.split(/\n\s*- url: /).find((b) => b.trim().startsWith(DMG));
-    sha512 = bloc && (bloc.match(/sha512:\s*(\S+)/) || [])[1];
-  }
-  return { version, url: dmg.browser_download_url, taille: dmg.size, sha512 };
+  return lireYml(await r.text());
+}
+
+function lireYml(texte) {
+  const version = (texte.match(/^version:\s*['"]?([\d.]+)/m) || [])[1];
+  // Bloc « - url: SSD-Drive-Sync-Mac.dmg » puis ses lignes « sha512: … » et « size: … »
+  const bloc = texte.split(/\n\s*- url: /).find((b) => b.trim().startsWith(DMG));
+  if (!version || !bloc) return null;
+  const sha512 = (bloc.match(/sha512:\s*(\S+)/) || [])[1];
+  const taille = Number((bloc.match(/size:\s*(\d+)/) || [])[1]);
+  if (!sha512 || !taille) return null;
+  return { version, url: `https://github.com/${DEPOT}/releases/download/v${version}/${DMG}`, taille, sha512 };
 }
 
 async function telecharger(info, dossier) {
@@ -134,4 +134,4 @@ function lancerRemplacement(cible, nouveau, pid, journal = '') {
   spawn('/bin/sh', [script, cible, nouveau, String(pid), cachee(cible, 'ancien'), journal], { detached: true, stdio: 'ignore' }).unref();
 }
 
-module.exports = { derniereVersion, telecharger, bundleActuel, raisonImpossible, preparer, lancerRemplacement, versionDe, DMG, DEPOT };
+module.exports = { derniereVersion, lireYml, telecharger, bundleActuel, raisonImpossible, preparer, lancerRemplacement, versionDe, DMG, DEPOT };
