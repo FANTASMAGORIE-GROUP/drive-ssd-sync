@@ -1,7 +1,7 @@
 {
   "name": "ssd-drive-sync",
   "productName": "SSD Drive Sync",
-  "version": "1.1.6",
+  "version": "1.1.7",
   "description": "Détecte les SSD branchés et remplit le Google Sheets des disques.",
   "main": "main.js",
   "private": true,

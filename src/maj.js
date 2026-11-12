@@ -43,7 +43,7 @@ async function verifierMac() {
 
 // Mac : remplace l'app puis la ferme ; le script relance la nouvelle. Sinon, ouvre le lien du .dmg.
 async function installerMac() {
-  // Téléchargement en arrière-plan raté : bouton « Télécharger », on ouvre simplement le lien du .dmg.
+  // Téléchargement en arrière-plan raté : bouton « MAJ », on ouvre simplement le lien du .dmg.
   if (!derniere || !derniere.prete) { await shell.openExternal(DMG); return null; }
   try {
     const cible = mac.bundleActuel(process.execPath);

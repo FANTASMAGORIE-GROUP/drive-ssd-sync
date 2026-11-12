@@ -272,7 +272,7 @@ function afficherMaj(info) {
   const b = $('maj');
   b.innerHTML = `${ico('sync')}<span><b>Nouvelle version ${echapper(info.version)} disponible</b>${info.prete
     ? 'Elle est déjà téléchargée.'
-    : 'Ouvre le fichier téléchargé et glisse l’app dans Applications.'}</span><button id="btn-maj">${info.prete ? 'Redémarrer' : 'Télécharger'}</button>`;
+    : 'Ouvre le fichier téléchargé et glisse l’app dans Applications.'}</span><button id="btn-maj">${info.prete ? 'Redémarrer' : 'MAJ'}</button>`;
   b.classList.remove('cache');
   $('btn-maj').onclick = async () => {
     const bouton = $('btn-maj');
