@@ -51,7 +51,7 @@ async function demanderJeton(params) {
     body: new URLSearchParams({ client_id: secrets.GOOGLE_CLIENT_ID, client_secret: secrets.GOOGLE_CLIENT_SECRET, ...params }),
   });
   const json = await r.json();
-  if (!r.ok) throw new Error(json.error_description || json.error);
+  if (!r.ok) throw Object.assign(new Error(json.error_description || json.error), { code: json.error });
   return json;
 }
 
@@ -59,8 +59,18 @@ let cache = { token: null, expire: 0 };
 async function accessToken() {
   if (cache.token && Date.now() < cache.expire) return cache.token;
   const g = store.get('google');
-  if (!g) throw new Error('Pas connectée à Google');
-  const j = await demanderJeton({ refresh_token: g.refresh_token, grant_type: 'refresh_token' });
+  if (!g) throw new Error('Pas connecté à Google');
+  let j;
+  try {
+    j = await demanderJeton({ refresh_token: g.refresh_token, grant_type: 'refresh_token' });
+  } catch (e) {
+    // Connexion expirée ou retirée par Google : on l'oublie pour que l'app redemande de se connecter.
+    if (e.code === 'invalid_grant') {
+      store.supprimer('google');
+      throw new Error('Ta connexion Google a expiré : reconnecte-toi');
+    }
+    throw e;
+  }
   cache = { token: j.access_token, expire: Date.now() + (j.expires_in - 60) * 1000 };
   return cache.token;
 }

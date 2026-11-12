@@ -128,7 +128,8 @@
   .illus.orange { background: var(--jaune-pale); color: #b07a0d; }
   @media (prefers-color-scheme: dark) { .alerte, .badge-double { color: #f2c86a; } }
   .erreur { color: var(--rouge); font-size: 12.5px; text-align: center; min-height: 18px; margin-top: 10px; }
-  footer { display: flex; justify-content: center; gap: 2px; padding-top: 6px; }
+  footer { display: flex; justify-content: center; gap: 0; padding-top: 6px; }
+  footer button.lien { white-space: nowrap; padding: 8px 5px; font-size: 12px; }
   .cache { display: none !important; }
 </style>
 </head>
@@ -313,7 +314,15 @@ async function ecranListe() {
   $('puce').innerHTML = `<span class="point"></span><span>${echapper(etat.titre)}</span>`;
   afficher('chargement', `<div class="anneau"></div><p class="texte">Je lis le fichier…</p>`);
   try { rendreListe(await window.app.disques()); }
-  catch (e) { afficher('liste', '', false); erreur(e.message); }
+  catch (e) {
+    // Connexion Google perdue : retour à l'écran de connexion, avec l'explication.
+    if (!(await window.app.etatInitial()).connecte) {
+      etat.connecte = false;
+      $('bas').classList.add('cache');
+      ecranConnexion();
+    } else afficher('liste', '', false);
+    erreur(e.message);
+  }
 }
 
 // La liste se relit toute seule (toutes les 30 s et au retour sur la fenêtre) pour suivre les changements
