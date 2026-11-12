@@ -274,7 +274,13 @@ function afficherMaj(info) {
     ? 'Elle est déjà téléchargée.'
     : 'Ouvre le fichier téléchargé et glisse l’app dans Applications.'}</span><button id="btn-maj">${info.prete ? 'Redémarrer' : 'Télécharger'}</button>`;
   b.classList.remove('cache');
-  $('btn-maj').onclick = () => window.app.majInstaller();
+  $('btn-maj').onclick = async () => {
+    const bouton = $('btn-maj');
+    if (info.prete) { bouton.disabled = true; bouton.textContent = 'Installation…'; }
+    const r = await window.app.majInstaller();
+    // Mac : remplacement impossible, le .dmg se télécharge à la place ; on le dit.
+    if (r && r.erreur) { erreur(r.erreur); bouton.disabled = false; bouton.textContent = 'Réessayer'; }
+  };
 }
 window.app.surMaj(afficherMaj);
 window.app.majEtat().then(afficherMaj);

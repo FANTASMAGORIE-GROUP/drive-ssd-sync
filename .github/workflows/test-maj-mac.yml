@@ -1,0 +1,22 @@
+name: Tester la mise à jour Mac
+
+# Sur un vrai Mac de GitHub : installe une ancienne version publiée, puis la met à jour vers la dernière
+# exactement comme le fait l'app (src/maj-mac.js). Ne publie rien. Voir test/maj-mac.js.
+on:
+  workflow_dispatch:
+    inputs:
+      ancienne:
+        description: Version de départ (tag)
+        default: v1.1.3
+  push:
+    branches: [test-maj-mac]
+
+jobs:
+  mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node test/maj-mac.js ${{ inputs.ancienne || 'v1.1.3' }}
