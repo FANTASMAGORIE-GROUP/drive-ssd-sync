@@ -131,9 +131,23 @@
   .illus.orange { background: var(--jaune-pale); color: #b07a0d; }
   @media (prefers-color-scheme: dark) { .alerte, .badge-double { color: #f2c86a; } }
   .erreur { color: var(--rouge); font-size: 12.5px; text-align: center; min-height: 18px; margin-top: 10px; }
-  footer { display: flex; justify-content: center; gap: 0; padding-top: 6px; }
+  footer { display: flex; flex-wrap: wrap; justify-content: center; gap: 0; padding-top: 6px; }
+  .illus.petit { width: 64px; height: 64px; border-radius: 20px; margin-bottom: 10px; }
+  .illus.petit svg.i { width: 30px; height: 30px; }
   footer button.lien { white-space: nowrap; padding: 8px 5px; font-size: 12px; }
   .cache { display: none !important; }
+  button.inactif { opacity: .45; }
+  .choix-dossier .sous { white-space: nowrap; }
+  .nom-dossier { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+  /* Chemin coupé au début pour toujours voir la fin (le dossier choisi). */
+  .chemin-dossier { display: block; font-size: 11px; direction: rtl; text-align: left; }
+  .tuiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 16px; text-align: left; }
+  .tuile { border-radius: 14px; padding: 10px 12px; display: flex; flex-direction: column; }
+  .tuile b { font-size: 20px; line-height: 1.1; } .tuile span { font-size: 12px; font-weight: 600; } .tuile small { font-size: 11px; opacity: .8; }
+  .exemples { margin-top: 12px; text-align: left; font-size: 12px; display: flex; flex-direction: column; gap: 5px; }
+  .exemples div { display: grid; grid-template-columns: 8px 1fr auto; gap: 8px; align-items: center; color: var(--doux); }
+  .exemples .chemin { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; direction: rtl; text-align: left; color: var(--texte); }
+  .pastille { width: 8px; height: 8px; border-radius: 50%; background: var(--rouge); } .pastille.different { background: var(--jaune); }
 </style>
 </head>
 <body>
@@ -153,6 +167,7 @@
     <button class="lien" id="btn-ouvrir"></button>
     <button class="lien" id="btn-changer"></button>
     <button class="lien" id="btn-cle"></button>
+    <button class="lien" id="btn-nas"></button>
   </footer>
 
 <script>
@@ -171,6 +186,9 @@ const ICONES = {
   coche: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
   nouveau: '<rect x="3" y="4" width="18" height="16" rx="4"/><path d="M12 9v6M9 12h6"/>',
   question: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5v.4"/><circle cx="12" cy="17" r=".6" fill="currentColor"/>',
+  nas: '<rect x="3" y="3" width="18" height="7" rx="2"/><rect x="3" y="14" width="18" height="7" rx="2"/><path d="M7 6.5h.01M7 17.5h.01M11 6.5h6M11 17.5h6"/>',
+  dossier: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/>',
+  comparer: '<path d="M8 3 4 7l4 4M4 7h12M16 13l4 4-4 4M20 17H8"/>',
 };
 const ico = (nom, classe = '') => `<svg class="i ${classe}" viewBox="0 0 24 24">${ICONES[nom]}</svg>`;
 
@@ -202,6 +220,14 @@ if (!window.app) {
     cleOpenai: async (k) => { await attendre(800); if (k !== 'sk-bonne-cle-de-test') throw new Error('OpenAI refuse cette clé : elle est fausse, expirée ou supprimée'); },
     ecrireContenu: async () => attendre(400), ouvrirDoublons: async () => {}, surProgres: (fn) => { window.__progres = fn; }, surDeconnexion: (fn) => { window.__deco = fn; },
     majEtat: async () => null, majInstaller: async () => {}, surMaj: (fn) => { window.__maj = fn; },
+    choisirDossier: async (t) => (/NAS/.test(t) ? '/Volumes/Fantasmagorie-NAS/Projets 2026' : '/Volumes/SSD 2/Projets'),
+    comparer: async () => {
+      for (const [cote, n] of [['source', 4200], ['source', 9800], ['nas', 3100], ['nas', 11250]]) { window.__comp?.({ cote, n }); await attendre(500); }
+      return { source: 'Projets', nas: 'Projets 2026', reseau: true, ou: 'sur le NAS', fichiers: 9753, doublons: 9712, doublonsGo: 1368.2, uniques: 41,
+        uniquesGo: 52.4, totalGo: 1420.6, pourcent: 96, rienEnCommun: false, exporte: true,
+        parDossier: [{ dossier: 'Clip Lumière', fichiers: 4210, go: 812.5 }, { dossier: 'Pub Maison Verte', fichiers: 3120, go: 401.2 }, { dossier: 'Studio photos 2026', fichiers: 2382, go: 154.5 }] };
+    },
+    annulerComparaison: async () => {}, ouvrirDiagnostics: async () => {}, surComparaison: (fn) => { window.__comp = fn; },
     verifier: async (n) => (n === '1' ? { autre: { modele: 'SanDisk Extreme 2 To', date: '03/11/2026' }, ecart: null }
       : n === '2' ? { autre: null, ecart: { fichier: 4, mesure: 2 } } : { autre: null, ecart: null }),
     renumeroter: async (ligne) => { const d = faux.find((x) => x.ligne === ligne); d.numero = '6'; faux.forEach((x) => { x.doublon = false; }); return '6'; },
@@ -635,6 +661,100 @@ async function travailler(action) {
   }
 }
 
+// ---------- Diagnostic SSD ↔ NAS (lecture seule) ----------
+
+const choixNas = { source: null, nas: null };
+const nomDossier = (p) => (p ? p.split(/[\\/]/).filter(Boolean).pop() : '');
+const taille = (o) => (o >= 1e9 ? `${fr((o / 1e9).toFixed(1))} Go` : `${fr((o / 1e6).toFixed(0))} Mo`);
+const nombre = (n) => Number(n).toLocaleString('fr-FR');
+
+function ecranComparer() {
+  $('bas').classList.add('cache'); // ecranListe le réaffiche
+  const carteDossier = (cote, titre, aide) => `<button class="disque choix-dossier" id="choix-${cote}">
+      <span class="num">${ico(cote === 'nas' ? 'nas' : 'dossier')}</span>
+      <span style="min-width:0">${choixNas[cote]
+    ? `<span class="sous" style="display:block;font-size:11px">${titre}</span>
+        <span class="nom nom-dossier">${echapper(nomDossier(choixNas[cote]))}</span>
+        <span class="sous chemin-dossier" title="${echapper(choixNas[cote])}">${echapper(choixNas[cote])}</span>`
+    : `<span class="nom">${titre}</span><span class="sous" style="display:block">${aide}</span>`}</span>
+      <span class="pct" style="background:var(--fond-2);color:var(--rose-fonce)">${choixNas[cote] ? 'Changer' : 'Choisir'}</span></button>`;
+  afficher('comparer', `${illus('comparer', 'petit')}
+    <p class="titre">Doublons avec le NAS</p>
+    <p class="texte">Je cherche les fichiers du SSD qui sont déjà sur le NAS (ou dans un autre dossier), même rangés ailleurs. Je ne fais que lire : rien n'est copié, déplacé ni supprimé.</p>
+    <div class="choix" style="margin-top:16px;overflow:visible">
+      ${carteDossier('source', 'Dossier à vérifier', 'Un dossier du SSD ou de l\'ordinateur')}
+      ${carteDossier('nas', 'Dossier du NAS (ou de référence)', 'Le NAS (Finder → Aller → Se connecter au serveur) ou un autre dossier')}
+    </div>
+    ${boutons([['lancer', 'comparer', 'Lancer le diagnostic', choixNas.source && choixNas.nas ? '' : 'inactif'], ['retour', 'retour', 'Retour à la liste', 'second']])}`);
+  for (const [cote, titre] of [['source', 'Dossier à vérifier (SSD ou ordinateur)'], ['nas', 'Dossier du NAS ou de référence']]) {
+    $(`choix-${cote}`).onclick = async () => {
+      const p = await window.app.choisirDossier(titre);
+      if (p) { choixNas[cote] = p; ecranComparer(); }
+    };
+  }
+  $('lancer').onclick = () => {
+    if (!choixNas.source || !choixNas.nas) return erreur('Choisis les deux dossiers');
+    if (choixNas.source === choixNas.nas) return erreur('Choisis deux dossiers différents');
+    lancerComparaison();
+  };
+  $('retour').onclick = ecranListe;
+}
+
+async function lancerComparaison() {
+  afficher('comparaison', `<div class="anneau"></div>
+    <p class="titre">Recherche des doublons</p>
+    <p class="texte" id="comp-etat">Je lis « ${echapper(nomDossier(choixNas.source))} »…</p>
+    <p class="texte" style="font-size:12px;margin-top:6px">Sur un NAS, ça peut prendre quelques minutes.</p>
+    ${boutons([['annuler', null, 'Annuler', 'second']])}`);
+  $('annuler').onclick = () => window.app.annulerComparaison();
+  try {
+    const s = await window.app.comparer(choixNas.source, choixNas.nas);
+    if (s.annule) return ecranComparer();
+    ecranResultat(s);
+  } catch (e) {
+    ecranComparer();
+    erreur(e.message);
+  }
+}
+
+window.app.surComparaison(({ cote, n }) => {
+  if (vue !== 'comparaison' || !$('comp-etat')) return;
+  $('comp-etat').textContent = cote === 'source'
+    ? `Je lis « ${nomDossier(choixNas.source)} » : ${nombre(n)} fichiers…`
+    : `Je lis « ${nomDossier(choixNas.nas)} » : ${nombre(n)} fichiers…`;
+});
+
+function ecranResultat(s) {
+  const tuile = (n, texte, couleur, pale, detail = '') => `<div class="tuile" style="background:${pale};color:${couleur}">
+    <b>${nombre(n)}</b><span>${texte}</span>${detail ? `<small>${detail}</small>` : ''}</div>`;
+  const titre = s.rienEnCommun ? 'Aucun doublon trouvé'
+    : !s.doublons ? 'Aucun doublon'
+      : s.uniques ? `${nombre(s.doublons)} doublons ${echapper(s.ou)}` : `Tout le dossier est déjà ${echapper(s.ou)}`;
+  afficher('resultat', `<div class="illus petit ${s.doublons ? 'vert' : 'orange'}">${ico(s.doublons ? 'comparer' : 'question')}</div>
+    <p class="titre">${titre}</p>
+    <p class="texte">${echapper(s.source)} ↔ ${echapper(s.nas)} · ${nombre(s.fichiers)} fichiers, ${fr(s.totalGo)} Go</p>
+    ${s.rienEnCommun ? `<div class="alerte" style="margin-top:12px;text-align:left">${ico('question')}<span><b>Ces deux dossiers n'ont aucun fichier en commun</b>
+      Vérifie que tu as choisi le bon dossier ${echapper(s.ou.replace(/^dans /, ''))}.</span></div>` : `
+    <div class="jauge"><div style="width:${s.pourcent}%;background:var(--vert)"></div></div>
+    <div class="stats"><span><b>${s.pourcent} %</b> du dossier est déjà ${echapper(s.ou)}</span></div>
+    <div class="tuiles">
+      ${tuile(s.doublons, `doublons ${echapper(s.ou)}`, 'var(--vert)', 'var(--vert-pale)', `${fr(s.doublonsGo)} Go`)}
+      ${tuile(s.uniques, 'seulement sur le SSD', 'var(--doux)', 'var(--fond-2)', `${fr(s.uniquesGo)} Go`)}
+    </div>
+    ${s.parDossier.length ? `<div class="exemples"><b style="color:var(--texte)">Doublons par dossier</b>${s.parDossier.map((d) => `<div><span class="pastille" style="background:var(--vert)"></span>
+      <span class="chemin" title="${echapper(d.dossier)}">${echapper(d.dossier)}</span><span>${nombre(d.fichiers)} · ${fr(d.go)} Go</span></div>`).join('')}</div>` : ''}`}
+    <p class="texte" style="font-size:12px;margin-top:10px">${s.exporte ? 'La liste complète est dans l\'onglet « Doublons NAS » du fichier.'
+      : s.erreurExport ? `Le détail n'a pas pu être écrit dans le fichier : ${echapper(s.erreurExport)}` : 'Le détail n\'a pas été écrit : aucun fichier Google relié.'}</p>
+    ${s.exporte ? boutons([['voir', 'fichier', 'Voir le détail dans le fichier']]) : ''}
+    <div class="actions" style="flex-direction:row;margin-top:9px">
+      <button id="retour" class="second" style="flex:1">${ico('retour')}Liste</button>
+      <button id="encore" class="second" style="flex:1">${ico('comparer')}Nouveau</button>
+    </div>`);
+  if ($('voir')) $('voir').onclick = () => window.app.ouvrirDiagnostics();
+  $('encore').onclick = ecranComparer;
+  $('retour').onclick = ecranListe;
+}
+
 window.app.surSsd(surSsd);
 window.app.surRetrait(() => {
   if (['pret', 'nouveau', 'verif'].includes(vue)) { ecranAttente(cible); erreur('Le SSD a été débranché'); }
@@ -652,6 +772,8 @@ $('btn-ouvrir').innerHTML = `${ico('fichier')}Ouvrir le fichier`;
 $('btn-changer').innerHTML = `${ico('reglage')}Changer de fichier`;
 $('btn-cle').innerHTML = `${ico('cle')}Clé OpenAI`;
 $('btn-cle').onclick = () => ecranCle(true);
+$('btn-nas').innerHTML = `${ico('nas')}Doublons avec le NAS`;
+$('btn-nas').onclick = () => ecranComparer();
 $('btn-ouvrir').onclick = () => window.app.ouvrirFichier();
 // L'ancien fichier reste relié tant que le nouveau n'a pas été validé.
 $('btn-changer').onclick = () => ecranFichier(true);
