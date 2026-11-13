@@ -1,11 +1,12 @@
 const path = require('path');
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
 const disk = require('./src/disk');
 const google = require('./src/google');
 const ai = require('./src/ai');
 const store = require('./src/store');
 const scan = require('./src/scan');
 const doublons = require('./src/doublons');
+const comparaison = require('./src/comparaison');
 const { numeroDansNom } = require('./src/numero');
 const { styleGeneral } = require('./src/style');
 const { proteger, majDirecte } = require('./src/garde');
@@ -440,6 +441,41 @@ ipcMain.handle('ecrire-contenu', (_e, numero, texte) => ecrireContenu(sheetId(),
 ipcMain.handle('ouvrir-fichier', () => shell.openExternal(`https://docs.google.com/spreadsheets/d/${sheetId()}`));
 ipcMain.handle('ouvrir-doublons', async () => {
   const gid = (await sheets.titres(sheetId())).ids.Doublons;
+  shell.openExternal(`https://docs.google.com/spreadsheets/d/${sheetId()}/edit${gid !== undefined ? `#gid=${gid}` : ''}`);
+});
+
+// ---------- Diagnostic SSD ↔ NAS ----------
+
+let comparaisonAnnulee = false;
+
+ipcMain.handle('choisir-dossier', async (_e, titre) => {
+  const r = await dialog.showOpenDialog(fenetre, { title: titre, properties: ['openDirectory'] });
+  return r.canceled ? null : r.filePaths[0];
+});
+
+ipcMain.handle('comparer', async (_e, source, nas) => {
+  comparaisonAnnulee = false;
+  const estAnnule = () => comparaisonAnnulee;
+  try {
+    const a = await comparaison.lister(source, (n) => envoyer('comparaison-progres', { cote: 'source', n }), estAnnule);
+    const b = await comparaison.lister(nas, (n) => envoyer('comparaison-progres', { cote: 'nas', n }), estAnnule);
+    const r = comparaison.comparer(a, b);
+    const s = comparaison.resume(r, path.basename(source) || source, path.basename(nas) || nas, await comparaison.estReseau(nas));
+    // Le résumé s'affiche même si l'écriture dans le fichier échoue (hors ligne, fichier non relié…).
+    if (sheetId() && google.estConnecte()) {
+      try { await comparaison.exporter(sheets, sheetId(), s, r); s.exporte = true; } catch (e) { s.erreurExport = e.message; }
+    }
+    return s;
+  } catch (e) {
+    if (e instanceof comparaison.Annule) return { annule: true };
+    throw e;
+  }
+});
+
+ipcMain.handle('annuler-comparaison', () => { comparaisonAnnulee = true; });
+
+ipcMain.handle('ouvrir-diagnostics', async () => {
+  const gid = (await sheets.titres(sheetId())).ids[comparaison.ONGLET];
   shell.openExternal(`https://docs.google.com/spreadsheets/d/${sheetId()}/edit${gid !== undefined ? `#gid=${gid}` : ''}`);
 });
 
