@@ -1,7 +1,7 @@
 {
   "name": "ssd-drive-sync",
   "productName": "SSD Drive Sync",
-  "version": "1.1.7",
+  "version": "1.1.8",
   "description": "Détecte les SSD branchés et remplit le Google Sheets des disques.",
   "main": "main.js",
   "private": true,
@@ -13,7 +13,8 @@
     "secrets": "node scripts/write-secrets.js",
     "dist": "electron-builder --publish never",
     "icone": "electron scripts/icone.js",
-    "publier": "electron-builder --publish always"
+    "publier": "electron-builder --publish always",
+    "test:comparaison": "node test/comparaison.js"
   },
   "build": {
     "appId": "com.fantasmagorie.ssddrivesync",
