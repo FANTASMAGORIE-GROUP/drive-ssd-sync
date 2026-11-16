@@ -62,19 +62,24 @@ async function installerMac() {
 function demarrer(envoyer) {
   prevenir = envoyer;
   if (!app.isPackaged) return; // pas pendant le développement
+  // Au démarrage de l'ordinateur, l'app se lance souvent avant que le réseau soit prêt : un échec est
+  // retenté au bout de 2, 10 puis 30 minutes au lieu d'attendre la vérification suivante, 6 h plus tard.
+  const RELANCES = [2, 10, 30].map((min) => min * 60 * 1000);
+  let essai = 0;
+  const echec = () => { if (essai < RELANCES.length) setTimeout(verifier, RELANCES[essai++]); };
   let verifier;
   if (process.platform === 'darwin') {
     // Les .dmg des versions déjà installées ne servent plus.
     fs.rmSync(dossierMac(), { recursive: true, force: true });
-    verifier = () => verifierMac().catch(() => {});
+    verifier = () => verifierMac().then(() => { essai = 0; }, echec);
   } else {
     const { autoUpdater } = require('electron-updater');
-    autoUpdater.on('update-downloaded', (i) => signaler({ version: i.version, prete: true }));
-    autoUpdater.on('error', () => {}); // pas de réseau, GitHub indisponible… on réessaiera plus tard
-    verifier = () => autoUpdater.checkForUpdates().catch(() => {});
+    autoUpdater.on('update-downloaded', (i) => { essai = 0; signaler({ version: i.version, prete: true }); });
+    autoUpdater.on('error', echec); // pas de réseau, GitHub indisponible, téléchargement coupé…
+    verifier = () => autoUpdater.checkForUpdates().catch(() => {}); // l'échec passe par l'événement « error »
   }
   verifier();
-  setInterval(verifier, SIX_HEURES);
+  setInterval(() => { essai = 0; verifier(); }, SIX_HEURES);
 }
 
 function installer() {
