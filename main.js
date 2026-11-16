@@ -19,7 +19,9 @@ let fenetre;
 let quitter = false;
 
 if (!app.requestSingleInstanceLock()) app.quit();
-app.on('second-instance', () => afficher());
+// « Relancer » l'app alors qu'elle tourne déjà (fenêtre seulement cachée) : on la réaffiche et on
+// revérifie les mises à jour si besoin, sinon elle attendrait la vérification suivante.
+app.on('second-instance', () => { afficher(); maj.reverifier(); });
 
 function afficher() {
   if (!fenetre) return;

@@ -26,6 +26,11 @@ function plusRecente(a, b) {
 
 function signaler(info) { derniere = info; prevenir(info); }
 
+const UNE_HEURE = 3600 * 1000;
+let verifier = null;     // lance une vérification (défini par demarrer, seulement dans l'app installée)
+let essai = 0;           // nombre d'échecs d'affilée
+let derniereVerif = 0;   // heure de la dernière vérification lancée
+
 // derniereVersion() ne renvoie une version que si son .dmg est bien envoyé sur GitHub.
 let enCours = false;
 async function verifierMac() {
@@ -65,9 +70,7 @@ function demarrer(envoyer) {
   // Au démarrage de l'ordinateur, l'app se lance souvent avant que le réseau soit prêt : un échec est
   // retenté au bout de 2, 10 puis 30 minutes au lieu d'attendre la vérification suivante, 6 h plus tard.
   const RELANCES = [2, 10, 30].map((min) => min * 60 * 1000);
-  let essai = 0;
   const echec = () => { if (essai < RELANCES.length) setTimeout(verifier, RELANCES[essai++]); };
-  let verifier;
   if (process.platform === 'darwin') {
     // Les .dmg des versions déjà installées ne servent plus.
     fs.rmSync(dossierMac(), { recursive: true, force: true });
@@ -78,8 +81,16 @@ function demarrer(envoyer) {
     autoUpdater.on('error', echec); // pas de réseau, GitHub indisponible, téléchargement coupé…
     verifier = () => autoUpdater.checkForUpdates().catch(() => {}); // l'échec passe par l'événement « error »
   }
+  const lancer = verifier;
+  verifier = () => { derniereVerif = Date.now(); return lancer(); };
   verifier();
   setInterval(() => { essai = 0; verifier(); }, SIX_HEURES);
+}
+
+// Revérifie maintenant si la dernière vérification a échoué ou date de plus d'une heure (fenêtre rouverte).
+function reverifier() {
+  if (!verifier || (derniere && derniere.prete)) return;
+  if (essai > 0 || Date.now() - derniereVerif > UNE_HEURE) { essai = 0; verifier(); }
 }
 
 function installer() {
@@ -87,4 +98,4 @@ function installer() {
   if (derniere && derniere.prete) require('electron-updater').autoUpdater.quitAndInstall(true, true);
 }
 
-module.exports = { demarrer, installer, etat: () => derniere, plusRecente };
+module.exports = { demarrer, reverifier, installer, etat: () => derniere, plusRecente };
