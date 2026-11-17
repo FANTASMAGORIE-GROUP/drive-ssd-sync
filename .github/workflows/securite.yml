@@ -1,0 +1,55 @@
+# Protocole de sécurité, repris de CreativGen (17/11/2026).
+# Deux contrôles à chaque proposition de changement et à chaque envoi sur main :
+#  - gitleaks cherche une clé, un mot de passe ou un jeton laissé dans le code
+#    (tout l'historique, pour que le premier passage serve aussi d'analyse) ;
+#  - Semgrep cherche les failles de sécurité connues dans le code.
+# Plus un passage complet chaque lundi, et à la demande (onglet Actions).
+name: Sécurité
+
+on:
+  pull_request:
+  push:
+    branches: ["main"]
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: securite-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cles:
+    name: Clés oubliées (gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      # Image figée par empreinte, même version que CreativGen.
+      # Un faux positif relu se déclare dans .gitleaksignore (une empreinte par ligne).
+      - name: Analyse gitleaks (tout l'historique)
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE:/repo" \
+            ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f \
+            detect --source=/repo --redact --verbose --no-banner
+
+  failles:
+    name: Failles (Semgrep)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container:
+      image: semgrep/semgrep:1.184.0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Règles publiques p/default, sans compte ni envoi de données (--metrics=off).
+      # Seules les failles graves (ERROR) font échouer le contrôle ; le reste s'affiche.
+      - name: Analyse Semgrep
+        run: semgrep scan --config p/default --metrics=off --severity ERROR --error
