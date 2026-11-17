@@ -1,0 +1,42 @@
+# Mises à jour des briques, reprises de CreativGen (17/11/2026), SANS fusion
+# automatique : Dependabot propose, les tests vérifient, une personne valide.
+# Une semaine d'attente avant de proposer une nouvelle version (cooldown) :
+# une brique piratée est en général retirée en quelques jours.
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Paris"
+    versioning-strategy: lockfile-only
+    open-pull-requests-limit: 3
+    rebase-strategy: disabled
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      mineures-et-correctifs:
+        applies-to: version-updates
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Paris"
+    open-pull-requests-limit: 3
+    rebase-strategy: disabled
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "chore(ci)"
+    groups:
+      github-actions:
+        patterns: ["*"]
